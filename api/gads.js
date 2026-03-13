@@ -19,11 +19,7 @@ export default async function handler(req, res) {
         grant_type:    "refresh_token",
       }),
     });
-    const tokenText = await tokenRes.text();
-    let tokenData;
-    try { tokenData = JSON.parse(tokenText); } catch(e) {
-      return res.status(500).json({ error: "Token parse error", raw: tokenText.slice(0, 300), status: tokenRes.status });
-    }
+    const tokenData = await tokenRes.json();
     if (!tokenData.access_token) {
       return res.status(500).json({ error: "Token error", detail: tokenData });
     }
@@ -55,11 +51,7 @@ export default async function handler(req, res) {
       }
     );
 
-    const gadsText = await gadsRes.text();
-    let gadsData;
-    try { gadsData = JSON.parse(gadsText); } catch(e) {
-      return res.status(500).json({ error: "Gads parse error", status: gadsRes.status, raw: gadsText.slice(0, 500) });
-    }
+    const gadsData = await gadsRes.json();
     if (!Array.isArray(gadsData)) {
       return res.status(500).json({ error: "Gads API error", detail: gadsData });
     }
@@ -69,7 +61,6 @@ export default async function handler(req, res) {
     for (const batch of gadsData) {
       for (const r of (batch.results || [])) {
         const campaign = r.campaign?.name || "";
-        if (!campaign.toLowerCase().includes("gads")) continue;
         rows.push({
           campaign,
           date:  r.segments?.date || "",
