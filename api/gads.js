@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     `;
 
     const gadsRes = await fetch(
-      `https://googleads.googleapis.com/v16/customers/${customerId}/googleAds:searchStream`,
+      `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
       {
         method: "POST",
         headers: {
