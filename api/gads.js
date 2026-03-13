@@ -19,7 +19,11 @@ export default async function handler(req, res) {
         grant_type:    "refresh_token",
       }),
     });
-    const tokenData = await tokenRes.json();
+    const tokenText = await tokenRes.text();
+    let tokenData;
+    try { tokenData = JSON.parse(tokenText); } catch(e) {
+      return res.status(500).json({ error: "Token parse error", raw: tokenText.slice(0, 300), status: tokenRes.status });
+    }
     if (!tokenData.access_token) {
       return res.status(500).json({ error: "Token error", detail: tokenData });
     }
