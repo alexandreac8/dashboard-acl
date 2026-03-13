@@ -54,7 +54,11 @@ export default async function handler(req, res) {
       }
     );
 
-    const gadsData = await gadsRes.json();
+    const gadsText = await gadsRes.text();
+    let gadsData;
+    try { gadsData = JSON.parse(gadsText); } catch(e) {
+      return res.status(500).json({ error: "Gads parse error", status: gadsRes.status, raw: gadsText.slice(0, 500) });
+    }
     if (!Array.isArray(gadsData)) {
       return res.status(500).json({ error: "Gads API error", detail: gadsData });
     }
