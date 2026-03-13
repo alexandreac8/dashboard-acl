@@ -42,13 +42,14 @@ export default async function handler(req, res) {
     `;
 
     const gadsRes = await fetch(
-      `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
+      `https://googleads.googleapis.com/v19/customers/${customerId}/googleAds:searchStream`,
       {
         method: "POST",
         headers: {
-          "Authorization":   `Bearer ${tokenData.access_token}`,
-          "developer-token": process.env.GADS_DEVELOPER_TOKEN,
-          "Content-Type":    "application/json",
+          "Authorization":     `Bearer ${tokenData.access_token}`,
+          "developer-token":   process.env.GADS_DEVELOPER_TOKEN,
+          "login-customer-id": customerId,
+          "Content-Type":      "application/json",
         },
         body: JSON.stringify({ query }),
       }
