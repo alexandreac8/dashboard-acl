@@ -26,17 +26,16 @@ export default async function handler(req, res) {
     const startDate = from || new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10);
     const endDate   = to   || new Date().toISOString().slice(0,10);
 
-    const salesRes  = await fetch(`https://api2.eduzz.com/sale/get_list`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ start_date: startDate, end_date: endDate, page: 1 }),
+    // Tenta GET com token na query string (formato legado documentado)
+    const params = new URLSearchParams({ token, start_date: startDate, end_date: endDate, page: 1 });
+    const salesRes  = await fetch(`https://api2.eduzz.com/sale/get_list?${params}`, {
+      method: "GET",
+      headers: { "Token": token },
     });
     const salesData = await salesRes.json();
 
-    if (!salesData?.data) return res.status(500).json({ error: "Eduzz API error", detail: salesData });
+    // Retorna resposta raw para debug
+    if (!salesData?.data) return res.status(500).json({ error: "Eduzz API error", detail: salesData, token_preview: token.slice(0,20) });
 
     // 3. Agrupar por produto
     const byProduct = {};
