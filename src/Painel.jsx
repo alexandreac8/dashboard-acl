@@ -73,49 +73,86 @@ export default function Painel() {
         )}
 {data && !loading && (
           <>
-            {/* Cards resumo */}
+            {/* Cards — Total combinado */}
+            <div style={{ marginBottom:6, fontSize:10, fontWeight:600, color:C.muted, fontFamily:"'JetBrains Mono',monospace", letterSpacing:1.5, textTransform:"uppercase" }}>TOTAL GERAL (sem duplicatas)</div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:16, marginBottom:28 }}>
-              <Card label="Total de Vendas" value={String(data.totalSales)} color={C.blue} />
-              <Card label="Faturamento" value={brl(data.totalRevenue)} color={C.green} />
-              <Card label="Ticket Médio" value={data.totalSales > 0 ? brl(data.totalRevenue / data.totalSales) : "—"} color="#6d28d9" />
+              <Card label="Total de Vendas" value={String(data.combined.totalSales)} color={C.blue} />
+              <Card label="Faturamento Total" value={brl(data.combined.totalRevenue)} color={C.green} />
+              <Card label="Ticket Médio" value={data.combined.totalSales > 0 ? brl(data.combined.totalRevenue / data.combined.totalSales) : "—"} color="#6d28d9" />
             </div>
 
-            {/* Tabela por produto */}
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, overflow:"hidden" }}>
-              <div style={{ padding:"16px 20px", borderBottom:`1px solid ${C.border}`, fontSize:12, fontWeight:600, color:C.text }}>
-                Por Produto
-              </div>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr style={{ background:"#f8fafc" }}>
-                    <Th>Produto</Th>
-                    <Th align="right">Vendas</Th>
-                    <Th align="right">Faturamento</Th>
-                    <Th align="right">Ticket Médio</Th>
-                    <Th align="right">% do Total</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.products.length === 0 && (
-                    <tr><td colSpan={5} style={{ textAlign:"center", padding:"32px", color:C.muted, fontSize:12 }}>Nenhuma venda paga no período</td></tr>
-                  )}
-                  {data.products.map((p,i) => (
-                    <tr key={i} style={{ borderTop:`1px solid ${C.border}` }}>
-                      <td style={{ padding:"12px 20px", fontSize:12, color:C.text, maxWidth:320, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</td>
-                      <td style={{ padding:"12px 20px", fontSize:12, color:C.text, textAlign:"right", fontFamily:"'JetBrains Mono',monospace" }}>{p.count}</td>
-                      <td style={{ padding:"12px 20px", fontSize:12, color:C.green, textAlign:"right", fontFamily:"'JetBrains Mono',monospace", fontWeight:600 }}>{brl(p.revenue)}</td>
-                      <td style={{ padding:"12px 20px", fontSize:12, color:C.text, textAlign:"right", fontFamily:"'JetBrains Mono',monospace" }}>{brl(p.revenue / p.count)}</td>
-                      <td style={{ padding:"12px 20px", fontSize:12, color:C.muted, textAlign:"right", fontFamily:"'JetBrains Mono',monospace" }}>
-                        {data.totalRevenue > 0 ? `${((p.revenue/data.totalRevenue)*100).toFixed(1)}%` : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Dois grupos lado a lado */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:28 }}>
+              <GroupCard title="Vendas Criadas no Período" color="#2563eb" group={data.created} />
+              <GroupCard title="Pagamentos Recebidos no Período" color="#0f7a4a" group={data.paid} />
             </div>
+
+            {/* Tabela combinada por produto */}
+            <ProductTable products={data.combined.products} totalRevenue={data.combined.totalRevenue} />
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function GroupCard({ title, color, group }) {
+  return (
+    <div style={{ background:C.card, border:`1.5px solid ${color}33`, borderRadius:10, padding:"18px 20px" }}>
+      <div style={{ fontSize:11, fontWeight:700, color, marginBottom:14, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>{title}</div>
+      <div style={{ display:"flex", gap:24, marginBottom:12 }}>
+        <div>
+          <div style={{ fontSize:9, color:C.muted, fontFamily:"'JetBrains Mono',monospace", letterSpacing:1.2, textTransform:"uppercase", marginBottom:4 }}>Vendas</div>
+          <div style={{ fontSize:18, fontWeight:700, color, fontFamily:"'JetBrains Mono',monospace" }}>{group.totalSales}</div>
+        </div>
+        <div>
+          <div style={{ fontSize:9, color:C.muted, fontFamily:"'JetBrains Mono',monospace", letterSpacing:1.2, textTransform:"uppercase", marginBottom:4 }}>Faturamento</div>
+          <div style={{ fontSize:18, fontWeight:700, color, fontFamily:"'JetBrains Mono',monospace" }}>{brl(group.totalRevenue)}</div>
+        </div>
+      </div>
+      {group.products.slice(0,3).map((p,i) => (
+        <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"5px 0", borderTop:`1px solid ${C.border}`, fontSize:11, color:C.text }}>
+          <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"65%" }}>{p.name}</span>
+          <span style={{ fontFamily:"'JetBrains Mono',monospace", color, fontWeight:600 }}>{brl(p.revenue)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProductTable({ products, totalRevenue }) {
+  return (
+    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, overflow:"hidden" }}>
+      <div style={{ padding:"16px 20px", borderBottom:`1px solid ${C.border}`, fontSize:12, fontWeight:600, color:C.text }}>
+        Por Produto — Total Combinado
+      </div>
+      <table style={{ width:"100%", borderCollapse:"collapse" }}>
+        <thead>
+          <tr style={{ background:"#f8fafc" }}>
+            <Th>Produto</Th>
+            <Th align="right">Vendas</Th>
+            <Th align="right">Faturamento</Th>
+            <Th align="right">Ticket Médio</Th>
+            <Th align="right">% do Total</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.length === 0 && (
+            <tr><td colSpan={5} style={{ textAlign:"center", padding:"32px", color:C.muted, fontSize:12 }}>Nenhuma venda no período</td></tr>
+          )}
+          {products.map((p,i) => (
+            <tr key={i} style={{ borderTop:`1px solid ${C.border}` }}>
+              <td style={{ padding:"12px 20px", fontSize:12, color:C.text, maxWidth:320, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</td>
+              <td style={{ padding:"12px 20px", fontSize:12, color:C.text, textAlign:"right", fontFamily:"'JetBrains Mono',monospace" }}>{p.count}</td>
+              <td style={{ padding:"12px 20px", fontSize:12, color:C.green, textAlign:"right", fontFamily:"'JetBrains Mono',monospace", fontWeight:600 }}>{brl(p.revenue)}</td>
+              <td style={{ padding:"12px 20px", fontSize:12, color:C.text, textAlign:"right", fontFamily:"'JetBrains Mono',monospace" }}>{brl(p.revenue / p.count)}</td>
+              <td style={{ padding:"12px 20px", fontSize:12, color:C.muted, textAlign:"right", fontFamily:"'JetBrains Mono',monospace" }}>
+                {totalRevenue > 0 ? `${((p.revenue/totalRevenue)*100).toFixed(1)}%` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
