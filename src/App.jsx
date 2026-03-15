@@ -1359,7 +1359,7 @@ export default function Dashboard(){
   const [showPassModal,setShowPassModal] = useState(false);
   const [passInput,setPassInput]         = useState("");
   const [passErr,setPassErr]             = useState(false);
-  const CONFIG_PASS = "acl2024";
+  const CONFIG_PASS = "libras";
   const [from,setFrom]   = useState(daysAgo(14));
   const [to,setTo]       = useState(today());
   const [mode,setMode]   = useState("capture");
