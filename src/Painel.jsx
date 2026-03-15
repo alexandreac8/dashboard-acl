@@ -71,6 +71,11 @@ export default function Painel() {
             {error}
           </div>
         )}
+        {data?.debug_first_sale && (
+          <pre style={{ background:"#1e293b", color:"#94f9b0", fontSize:10, padding:16, borderRadius:8, overflow:"auto", marginBottom:20 }}>
+            {JSON.stringify(data.debug_first_sale, null, 2)}
+          </pre>
+        )}
         {data && !loading && (
           <>
             {/* Cards resumo */}
