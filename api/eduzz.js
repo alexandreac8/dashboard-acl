@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   const PUBLICKEY = "28448095";
   const APIKEY    = "bb768716a34a575";
-  const EMAIL     = process.env.EDUZZ_EMAIL || "alexandre.avilac@gmail.com";
+  const EMAIL     = process.env.EDUZZ_EMAIL || "academiadelibras.adm@gmail.com";
 
   try {
     // 1. Gerar token
