@@ -84,7 +84,7 @@ export default function Painel() {
             {/* Dois grupos lado a lado */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:28 }}>
               <GroupCard title="Vendas Criadas no Período" color="#2563eb" group={data.created} />
-              <GroupCard title="Pagamentos Recebidos no Período" color="#0f7a4a" group={data.paid} />
+              <GroupCard title="Vendas Recorrentes" color="#0f7a4a" group={data.paid} />
             </div>
 
             {/* Tabela combinada por produto */}
