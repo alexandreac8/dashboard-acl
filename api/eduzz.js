@@ -7,45 +7,49 @@ export default async function handler(req, res) {
 
   const { from, to } = req.body || {};
 
-  const PUBLICKEY = "28448095";
-  const APIKEY    = "bb768716a34a575";
-  const EMAIL     = process.env.EDUZZ_EMAIL || "academiadelibras.adm@gmail.com";
+  const ACCESS_TOKEN = "edzpap_PA6-Vni0f_qX2tyEAMkeaFBZp0QB4H6ZncnDf8AWwn2-TtNQGG1bXG-BLIaahHjVHUF7iwNklQsuR36rwnJ";
+
+  const startDate = from || new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10);
+  const endDate   = to   || new Date().toISOString().slice(0,10);
 
   try {
-    // 1. Gerar token
-    const tokenRes = await fetch("https://api2.eduzz.com/credential/generate_token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ publickey: PUBLICKEY, apikey: APIKEY, email: EMAIL }),
-    });
-    const tokenData = await tokenRes.json();
-    const token = tokenData?.data?.token;
-    if (!token) return res.status(500).json({ error: "Token Eduzz falhou", detail: tokenData });
+    // Buscar todas as páginas de vendas
+    let allSales = [];
+    let page = 1;
+    let totalPages = 1;
 
-    // 2. Buscar vendas
-    const startDate = from || new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10);
-    const endDate   = to   || new Date().toISOString().slice(0,10);
+    do {
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+        referenceDate: "paidAt",
+        page,
+        itemsPerPage: 100,
+      });
 
-    // Tenta GET com token na query string (formato legado documentado)
-    const params = new URLSearchParams({ token, start_date: startDate, end_date: endDate, page: 1 });
-    const salesRes  = await fetch(`https://api2.eduzz.com/sale/get_list?${params}`, {
-      method: "GET",
-      headers: { "Token": token },
-    });
-    const salesData = await salesRes.json();
+      const salesRes = await fetch(`https://api.eduzz.com/myeduzz/v1/sales?${params}`, {
+        headers: { "Authorization": `bearer ${ACCESS_TOKEN}` },
+      });
+      const salesData = await salesRes.json();
 
-    // Retorna resposta raw para debug
-    if (!salesData?.data) return res.status(500).json({ error: "Eduzz API error", detail: salesData, token_preview: token.slice(0,20) });
+      if (!salesData?.items) {
+        return res.status(500).json({ error: "Eduzz API error", detail: salesData });
+      }
 
-    // 3. Agrupar por produto
+      allSales = allSales.concat(salesData.items);
+      totalPages = salesData.pages || 1;
+      page++;
+    } while (page <= totalPages && page <= 10);
+
+    // Agrupar por produto
     const byProduct = {};
     let totalRevenue = 0;
     let totalSales   = 0;
 
-    for (const sale of salesData.data) {
-      if (sale.sale_status !== "paid" && sale.sale_status !== "3") continue;
-      const name  = sale.content_title || sale.product_title || "Produto";
-      const value = parseFloat(sale.sale_net || sale.sale_value || 0);
+    for (const sale of allSales) {
+      if (sale.status !== "paid") continue;
+      const name  = sale.product?.name || "Produto";
+      const value = parseFloat(sale.netGain || sale.grossGain || sale.total?.value || 0);
       if (!byProduct[name]) byProduct[name] = { name, count: 0, revenue: 0 };
       byProduct[name].count   += 1;
       byProduct[name].revenue += value;
@@ -57,7 +61,6 @@ export default async function handler(req, res) {
       totalSales,
       totalRevenue,
       products: Object.values(byProduct).sort((a,b) => b.revenue - a.revenue),
-      raw: salesData.data.length,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
