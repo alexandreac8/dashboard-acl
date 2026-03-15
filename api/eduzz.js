@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     for (const sale of allSales) {
       if (sale.status !== "paid") continue;
       const name  = sale.product?.name || "Produto";
-      const value = parseFloat(sale.netGain || sale.grossGain || sale.total?.value || 0);
+      const value = parseFloat(sale.total?.value || sale.netGain?.value || sale.grossGain?.value || 0);
       if (!byProduct[name]) byProduct[name] = { name, count: 0, revenue: 0 };
       byProduct[name].count   += 1;
       byProduct[name].revenue += value;
@@ -58,7 +58,6 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      debug_first_sale: allSales.find(s => s.status === "paid") || allSales[0] || null,
       totalSales,
       totalRevenue,
       products: Object.values(byProduct).sort((a,b) => b.revenue - a.revenue),
