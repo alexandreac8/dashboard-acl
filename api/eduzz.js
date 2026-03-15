@@ -58,6 +58,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
+      debug_first_sale: allSales.find(s => s.status === "paid") || allSales[0] || null,
       totalSales,
       totalRevenue,
       products: Object.values(byProduct).sort((a,b) => b.revenue - a.revenue),
