@@ -1356,6 +1356,10 @@ export default function Dashboard(){
   const [page,setPage]   = useState("dash");
   const [tab,setTab]     = useState("perpetuo");
   const [cfg,setCfg]     = useState(DEFAULT_CFG);
+  const [showPassModal,setShowPassModal] = useState(false);
+  const [passInput,setPassInput]         = useState("");
+  const [passErr,setPassErr]             = useState(false);
+  const CONFIG_PASS = "acl2024";
   const [from,setFrom]   = useState(daysAgo(14));
   const [to,setTo]       = useState(today());
   const [mode,setMode]   = useState("capture");
@@ -1432,7 +1436,10 @@ export default function Dashboard(){
               }}>{l}</button>
             ))}
           </div>
-          <button onClick={()=>setPage(p=>p==="cfg"?"dash":"cfg")} style={{
+          <button onClick={()=>{
+            if(page==="cfg"){setPage("dash");}
+            else{setPassInput("");setPassErr(false);setShowPassModal(true);}
+          }} style={{
             padding:"6px 10px",background:"transparent",border:`1px solid ${C.border}`,
             color:"#64748b",borderRadius:4,cursor:"pointer",fontSize:14,
           }}>{page==="cfg"?"←":"⚙"}</button>
@@ -1621,6 +1628,40 @@ export default function Dashboard(){
           </div>
           ))}
       </div>
+
+      {/* Modal de senha para Config */}
+      {showPassModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999}}
+          onClick={()=>setShowPassModal(false)}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"28px 32px",minWidth:300,boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:18,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>🔒 Acesso às Configurações</div>
+            <input
+              autoFocus
+              type="password"
+              placeholder="Digite a senha"
+              value={passInput}
+              onChange={e=>{setPassInput(e.target.value);setPassErr(false);}}
+              onKeyDown={e=>{
+                if(e.key==="Enter"){
+                  if(passInput===CONFIG_PASS){setShowPassModal(false);setPage("cfg");}
+                  else{setPassErr(true);setPassInput("");}
+                }
+                if(e.key==="Escape")setShowPassModal(false);
+              }}
+              style={{width:"100%",background:"#f1f5f9",border:`1.5px solid ${passErr?"#ef4444":C.border2}`,borderRadius:6,padding:"9px 12px",color:C.text,fontFamily:"'JetBrains Mono',monospace",fontSize:13,boxSizing:"border-box",outline:"none"}}
+            />
+            {passErr&&<div style={{color:"#ef4444",fontSize:11,marginTop:6,fontFamily:"'JetBrains Mono',monospace"}}>Senha incorreta</div>}
+            <div style={{display:"flex",gap:8,marginTop:16,justifyContent:"flex-end"}}>
+              <button onClick={()=>setShowPassModal(false)} style={{padding:"7px 14px",background:"transparent",border:`1px solid ${C.border}`,color:C.muted,borderRadius:5,cursor:"pointer",fontSize:12}}>Cancelar</button>
+              <button onClick={()=>{
+                if(passInput===CONFIG_PASS){setShowPassModal(false);setPage("cfg");}
+                else{setPassErr(true);setPassInput("");}
+              }} style={{padding:"7px 14px",background:"#3b82f6",border:"none",color:"#fff",borderRadius:5,cursor:"pointer",fontSize:12,fontWeight:600}}>Entrar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
