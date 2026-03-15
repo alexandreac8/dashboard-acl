@@ -26,14 +26,13 @@ export default async function handler(req, res) {
     const startDate = from || new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10);
     const endDate   = to   || new Date().toISOString().slice(0,10);
 
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date:   endDate,
-      page:       1,
-    });
-
-    const salesRes  = await fetch(`https://api2.eduzz.com/sale/get_list?${params}`, {
-      headers: { "Authorization": `Bearer ${token}` },
+    const salesRes  = await fetch(`https://api2.eduzz.com/sale/get_list`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ start_date: startDate, end_date: endDate, page: 1 }),
     });
     const salesData = await salesRes.json();
 
