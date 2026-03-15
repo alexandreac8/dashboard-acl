@@ -641,7 +641,7 @@ function CampaignRow({camp,mode,idx,acaoMode}){
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const DEFAULT_CFG={
-  metaToken:"",metaAccountId:"act_975999499140043",
+  metaToken:"EAAgp729x6MEBQ3YPgI2lpQiZCJ09dZC27LToLc2vaHiaCzSgZBztQlEhPXjLDW5JwU1gCcqM36UzZASWiiSsXc4U3iBzcXQS2ozIZBnfdNqs8SHT2EmKUvGrSIK5ue82nZAtFkjV56msvBEWw6V1fh1yYD8S4b5VRi3VOUguu2ZAcd968DZAfu5LYgKeSA2PQNX4PzMZD",metaAccountId:"act_975999499140043",
   gadsUrl:"",
   gadsClientId:"753189472569-g7s2mqj22euh8fhmfslvcpevs8lqm7vq.apps.googleusercontent.com",
   gadsClientSecret:"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",
