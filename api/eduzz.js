@@ -49,15 +49,21 @@ export default async function handler(req, res) {
       fetchSales("paidAt"),
     ]);
 
-    const created = crunch(salesCreated);
-    const paid    = crunch(salesPaid);
+    // IDs das vendas criadas no período
+    const createdIds = new Set(salesCreated.map(s => s.id));
 
-    // Total combinado (evita duplicatas pelo id)
+    // Recorrentes = pagas no período que NÃO foram criadas no período
+    const salesRecorrentes = salesPaid.filter(s => !createdIds.has(s.id));
+
+    const created     = crunch(salesCreated);
+    const recorrentes = crunch(salesRecorrentes);
+
+    // Total combinado = criadas + recorrentes (sem duplicata)
     const allById = {};
-    for (const s of [...salesCreated, ...salesPaid]) allById[s.id] = s;
+    for (const s of [...salesCreated, ...salesRecorrentes]) allById[s.id] = s;
     const combined = crunch(Object.values(allById));
 
-    return res.status(200).json({ created, paid, combined });
+    return res.status(200).json({ created, paid: recorrentes, combined });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
