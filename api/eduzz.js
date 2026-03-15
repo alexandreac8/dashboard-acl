@@ -27,13 +27,14 @@ export default async function handler(req, res) {
     const endDate   = to   || new Date().toISOString().slice(0,10);
 
     const params = new URLSearchParams({
-      token,
       start_date: startDate,
       end_date:   endDate,
       page:       1,
     });
 
-    const salesRes  = await fetch(`https://api2.eduzz.com/sale/get_list?${params}`);
+    const salesRes  = await fetch(`https://api2.eduzz.com/sale/get_list?${params}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
     const salesData = await salesRes.json();
 
     if (!salesData?.data) return res.status(500).json({ error: "Eduzz API error", detail: salesData });
