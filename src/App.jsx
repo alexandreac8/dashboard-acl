@@ -716,7 +716,8 @@ async function fetchMetaM6Daily(cfg) {
   const fmt90 = (d) => d.toISOString().slice(0,10);
   const timeRange = encodeURIComponent(JSON.stringify({ since: fmt90(from), until: fmt90(today) }));
   const fields = "campaign_name,spend,date_start";
-  const baseUrl = `https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&limit=500&access_token=${cfg.metaToken}`;
+  const filtering = encodeURIComponent(JSON.stringify([{field:"campaign.name",operator:"CONTAIN",value:"M6"}]));
+  const baseUrl = `https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${cfg.metaToken}`;
   const all = [];
   let url = baseUrl;
   while (url) {
@@ -726,7 +727,7 @@ async function fetchMetaM6Daily(cfg) {
     all.push(...(data.data || []));
     url = data.paging?.next || null;
   }
-  return all.filter(r => r.campaign_name && r.campaign_name.toUpperCase().includes("M6"));
+  return all;
 }
 
 function getCaptureDatesForCiclo(cicloTag) {
