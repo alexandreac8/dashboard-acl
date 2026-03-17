@@ -779,10 +779,12 @@ function SemanalPanel({ cfg, preco }) {
   const [visible,  setVisible]  = useState(8);
 
   const load = useCallback(async () => {
+    console.log("[SEM] load called — csvUrl:", !!cfg.csvUrl, "metaId:", !!cfg.metaAccountId, "metaToken:", !!cfg.metaToken);
     if (!cfg.csvUrl && !cfg.metaAccountId) { setLoaded(true); return; }
     setLoading(true); setError(null);
     try {
       const s = cfg.csvUrl ? await fetchSheetsSemanal(cfg, preco) : [];
+      console.log("[SEM] sales M6 da planilha:", s.length, s[0]);
       setSales(s);
       if (cfg.metaAccountId && cfg.metaToken) {
         const metaDaily = await fetchMetaM6Daily(cfg);
