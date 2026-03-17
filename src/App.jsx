@@ -1166,7 +1166,7 @@ function DiarioPanel({ cfg, preco }) {
     finally { setLoading(false); }
   }, [cfg, preco]);
 
-  useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [cfg.metaToken, cfg.csvUrl]);
 
   // Filter gadsRows by period
   const filteredGads = gadsRows.filter(r => r.date >= from && r.date <= to);
