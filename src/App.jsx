@@ -789,7 +789,7 @@ function SemanalPanel({ cfg, preco }) {
   }, [cfg, preco]);
 
   // Load on mount
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [cfg.metaToken, cfg.csvUrl]);
 
   // Group sales by ciclo_sem
   const cycleMap = {};
