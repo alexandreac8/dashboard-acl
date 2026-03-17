@@ -346,6 +346,9 @@ async function fetchSheets(cfg,preco){
       const source=(r[+cfg.colSource]||"").trim().toUpperCase().replace(/\s+/g,"");
       if(source===""||source==="GADS"||source==="GOOGLE"||source==="YOUTUBE"||source==="ORGANIC") return false;
       if(source.length>0 && !source.includes("PRF") && !source.includes("M-SD") && !source.includes("META") && !source.includes("FACE")) return false;
+      // Exclui campanhas M6 (semanal) — pertencem à aba META SEMANAL
+      const campaign=(r[+cfg.colCampaign]||"").toUpperCase();
+      if(campaign.includes("M6")) return false;
       return true;
     })
     .map(r=>{
