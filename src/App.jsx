@@ -235,6 +235,10 @@ function crunchAll(metaAds, salesRows, from, to) {
     const revSale=bySale.reduce((a,s)=>a+s.value,0); // já é a soma correta
     const revLag =lag.reduce((a,s)=>a+s.value,0);
     const cvr    =leads>0?(byCap.length/leads)*100:null;
+    // avgDays: média de dias entre capture_date e sale_date (só vendas com capture_date)
+    const daysArr=bySale.filter(s=>s.capture_date).map(s=>Math.max(0,Math.round((new Date(s.sale_date)-new Date(s.capture_date))/86400000)));
+    const daysCount=daysArr.length;
+    const avgDays=daysCount>0?daysArr.reduce((a,b)=>a+b,0)/daysCount:null;
     return {
       revCap,  salesCap:byCap.length,
       roasCap: spend>0&&revCap>0?revCap/spend:null,
@@ -245,6 +249,7 @@ function crunchAll(metaAds, salesRows, from, to) {
       revLag,  lagCount:lag.length,
       salesNow:saleNow.length, cvr,
       cpl:leads>0?spend/leads:null,
+      avgDays, daysCount,
     };
   }
 
@@ -620,10 +625,11 @@ function CampaignRow({camp,mode,idx,acaoMode}){
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.text}}>{fmt.num(sales)}</td>
         <td style={{padding:"13px 14px",textAlign:"right"}}><CvrBadge v={camp.cvr}/></td>
         <td style={{padding:"13px 14px",textAlign:"right",background:roasBg,borderRadius:4}}><RoasBadge v={roas}/></td>
+        {!isCap&&<td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{camp.avgDays!=null?`${Math.round(camp.avgDays)}d`:"—"}</td>}
       </tr>
       {open&&(
         <tr>
-          <td colSpan={10} style={{padding:0,background:"#f1f5f9",borderBottom:`1px solid ${C.border2}`}}>
+          <td colSpan={!isCap?11:10} style={{padding:0,background:"#f1f5f9",borderBottom:`1px solid ${C.border2}`}}>
             <div className="slide-down" style={{borderLeft:`3px solid ${C.blue}66`,marginLeft:36}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead style={{position:"relative",zIndex:10}}>
@@ -1623,11 +1629,34 @@ export default function Dashboard(){
                         <th key={h} style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>{h}</th>
                       ))}
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"88",fontFamily:"'JetBrains Mono',monospace"}}>ROAS</th>
+                      {!isCap&&<th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>⏱ CV</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((camp,i)=><CampaignRow key={camp.name} camp={camp} mode={mode} idx={i} acaoMode={acaoMode}/>)}
                   </tbody>
+                  {!isCap&&(()=>{
+                    const totalDaysCount=rows.reduce((s,r)=>s+(r.daysCount||0),0);
+                    const totalDaysSum  =rows.reduce((s,r)=>s+(r.avgDays!=null?r.avgDays*(r.daysCount||0):0),0);
+                    const totAvgDays    =totalDaysCount>0?totalDaysSum/totalDaysCount:null;
+                    return(
+                      <tfoot>
+                        <tr style={{borderTop:`2px solid ${C.border2}`,background:"#f8fafc"}}>
+                          <td/>
+                          <td style={{padding:"9px 14px",fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:C.muted,letterSpacing:1,textTransform:"uppercase"}}>Total</td>
+                          <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.red,fontWeight:600}}>{fmt.brl(totSpend)}</td>
+                          <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.teal,fontWeight:600}}>{fmt.num(totLeads)}</td>
+                          <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.brl(cpl)}</td>
+                          <td/>
+                          <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green,fontWeight:600}}>{fmt.brl(totRevSale)}</td>
+                          <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600}}>{fmt.num(totSalesSale)}</td>
+                          <td/>
+                          <td style={{padding:"9px 14px",textAlign:"right"}}><RoasBadge v={roas_sale}/></td>
+                          <td style={{padding:"9px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted,fontWeight:600}}>{totAvgDays!=null?`${Math.round(totAvgDays)}d`:"—"}</td>
+                        </tr>
+                      </tfoot>
+                    );
+                  })()}
                 </table>
               </div>
             </div>
