@@ -777,26 +777,29 @@ function SemanalPanel({ cfg, preco }) {
   const [error,    setError]    = useState(null);
   const [loaded,   setLoaded]   = useState(false);
   const [visible,  setVisible]  = useState(8);
+  const [dbg,      setDbg]      = useState(null);
 
   const load = useCallback(async () => {
-    console.log("[SEM] load called — csvUrl:", !!cfg.csvUrl, "metaId:", !!cfg.metaAccountId, "metaToken:", !!cfg.metaToken);
     if (!cfg.csvUrl && !cfg.metaAccountId) { setLoaded(true); return; }
     setLoading(true); setError(null);
+    const info = { csvUrl: !!cfg.csvUrl, metaId: !!cfg.metaAccountId, metaToken: !!cfg.metaToken, salesCount: 0, metaDailyCount: 0, metaNomes: [], cicloKeys: [], spendMap: {} };
     try {
       const s = cfg.csvUrl ? await fetchSheetsSemanal(cfg, preco) : [];
-      console.log("[SEM] sales M6 da planilha:", s.length, s[0]);
+      info.salesCount = s.length;
       setSales(s);
       if (cfg.metaAccountId && cfg.metaToken) {
         const metaDaily = await fetchMetaM6Daily(cfg);
+        info.metaDailyCount = metaDaily.length;
+        info.metaNomes = [...new Set(metaDaily.map(r => r.campaign_name))];
         const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
-        console.log("[M6] cicloKeys da planilha:", cicloKeys);
+        info.cicloKeys = cicloKeys;
         const sm = assignSpendToCycles(metaDaily, cicloKeys);
-        console.log("[M6] spendMap resultante:", sm);
+        info.spendMap = sm;
         setSpendMap(sm);
       }
       setLoaded(true);
     } catch(e) { setError(e.message); }
-    finally   { setLoading(false); }
+    finally   { setLoading(false); setDbg(info); }
   }, [cfg, preco]);
 
   // Load on mount
@@ -837,6 +840,18 @@ function SemanalPanel({ cfg, preco }) {
           {loading ? "carregando…" : "↺ Atualizar"}
         </button>
       </div>
+
+      {dbg && (
+        <div style={{background:"#0f172a",color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",fontSize:10,padding:"10px 14px",borderRadius:6,marginBottom:14,lineHeight:1.8}}>
+          <div style={{color:"#f8fafc",fontWeight:700,marginBottom:4}}>DEBUG SEMANAL</div>
+          <div>csvUrl: <b style={{color:dbg.csvUrl?"#4ade80":"#f87171"}}>{String(dbg.csvUrl)}</b> | metaId: <b style={{color:dbg.metaId?"#4ade80":"#f87171"}}>{String(dbg.metaId)}</b> | metaToken: <b style={{color:dbg.metaToken?"#4ade80":"#f87171"}}>{String(dbg.metaToken)}</b></div>
+          <div>salesCount (M6 planilha): <b style={{color:"#fbbf24"}}>{dbg.salesCount}</b></div>
+          <div>metaDailyCount (após filtro M6): <b style={{color:"#fbbf24"}}>{dbg.metaDailyCount}</b></div>
+          <div>metaNomes: <b style={{color:"#60a5fa"}}>{dbg.metaNomes.length ? dbg.metaNomes.join(" | ") : "—"}</b></div>
+          <div>cicloKeys: <b style={{color:"#60a5fa"}}>{dbg.cicloKeys.length ? dbg.cicloKeys.join(", ") : "—"}</b></div>
+          <div>spendMap: <b style={{color:"#4ade80"}}>{Object.keys(dbg.spendMap).length ? JSON.stringify(dbg.spendMap) : "—"}</b></div>
+        </div>
+      )}
 
       {error && (
         <div style={{background:"#fef2f2",border:`1px solid #fca5a5`,borderRadius:5,padding:"9px 14px",marginBottom:16,color:C.red,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>⚠ {error}</div>
