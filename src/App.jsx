@@ -778,6 +778,9 @@ function SemanalPanel({ cfg, preco }) {
         const metaDaily = await fetchMetaM6Daily(cfg);
         const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
         const sm = assignSpendToCycles(metaDaily, cicloKeys);
+        console.log("metaDaily M6:", metaDaily.length, metaDaily.slice(0,3));
+        console.log("cicloKeys:", cicloKeys);
+        console.log("spendMap:", sm);
         setSpendMap(sm);
       }
       setLoaded(true);
