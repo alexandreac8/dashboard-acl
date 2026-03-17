@@ -46,12 +46,13 @@ const fmt = {
   pct: v => (v==null||isNaN(v)) ? "—" : `${Number(v).toFixed(1)}%`,
 };
 
-function today()    { return new Date().toISOString().slice(0,10); }
-function daysAgo(n) { const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); }
+function localISODate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function today()    { return localISODate(new Date()); }
+function daysAgo(n) { const d=new Date(); d.setDate(d.getDate()-n); return localISODate(d); }
 const _c15 = new Date(); _c15.setDate(_c15.getDate()-15);
-const CUTOFF15 = _c15.toISOString().slice(0,10);
+const CUTOFF15 = localISODate(_c15);
 const _c7 = new Date(); _c7.setDate(_c7.getDate()-7);
-const CUTOFF7 = _c7.toISOString().slice(0,10);
+const CUTOFF7 = localISODate(_c7);
 
 function parseDate(s) {
   if (!s) return null;
