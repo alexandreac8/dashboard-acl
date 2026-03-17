@@ -710,17 +710,23 @@ function ConfigPanel({cfg,onSave}){
 
 
 async function fetchMetaM6Daily(cfg) {
-  // Pega gasto diário dos últimos 90 dias das campanhas M6
+  // Pega gasto diário dos últimos 90 dias das campanhas M6 (com paginação)
   const today = new Date();
   const from  = new Date(today); from.setDate(today.getDate() - 90);
   const fmt90 = (d) => d.toISOString().slice(0,10);
   const timeRange = encodeURIComponent(JSON.stringify({ since: fmt90(from), until: fmt90(today) }));
   const fields = "campaign_name,spend,date_start";
-  const url = `https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&limit=1000&access_token=${cfg.metaToken}`;
-  const res  = await fetch(url);
-  const data = await res.json();
-  if (data.error) throw new Error(`Meta API: ${data.error.message}`);
-  return data.data || [];
+  const baseUrl = `https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&limit=500&access_token=${cfg.metaToken}`;
+  const all = [];
+  let url = baseUrl;
+  while (url) {
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.error) throw new Error(`Meta API: ${data.error.message}`);
+    all.push(...(data.data || []));
+    url = data.paging?.next || null;
+  }
+  return all.filter(r => r.campaign_name && r.campaign_name.toUpperCase().includes("M6"));
 }
 
 function getCaptureDatesForCiclo(cicloTag) {
@@ -772,29 +778,22 @@ function SemanalPanel({ cfg, preco }) {
   const [error,    setError]    = useState(null);
   const [loaded,   setLoaded]   = useState(false);
   const [visible,  setVisible]  = useState(8);
-  const [dbg,      setDbg]      = useState(null);
 
   const load = useCallback(async () => {
     if (!cfg.csvUrl && !cfg.metaAccountId) { setLoaded(true); return; }
     setLoading(true); setError(null);
-    const info = { csvUrl: !!cfg.csvUrl, metaId: !!cfg.metaAccountId, metaToken: !!cfg.metaToken, salesCount: 0, metaDailyCount: 0, metaNomes: [], cicloKeys: [], spendMap: {} };
     try {
       const s = cfg.csvUrl ? await fetchSheetsSemanal(cfg, preco) : [];
-      info.salesCount = s.length;
       setSales(s);
       if (cfg.metaAccountId && cfg.metaToken) {
         const metaDaily = await fetchMetaM6Daily(cfg);
-        info.metaDailyCount = metaDaily.length;
-        info.metaNomes = [...new Set(metaDaily.map(r => r.campaign_name))].slice(0, 10);
         const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
-        info.cicloKeys = cicloKeys;
         const sm = assignSpendToCycles(metaDaily, cicloKeys);
-        info.spendMap = sm;
         setSpendMap(sm);
       }
       setLoaded(true);
     } catch(e) { setError(e.message); }
-    finally   { setLoading(false); setDbg(info); }
+    finally   { setLoading(false); }
   }, [cfg, preco]);
 
   // Load on mount
@@ -835,18 +834,6 @@ function SemanalPanel({ cfg, preco }) {
           {loading ? "carregando…" : "↺ Atualizar"}
         </button>
       </div>
-
-      {dbg && (
-        <div style={{background:"#0f172a",color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",fontSize:10,padding:"10px 14px",borderRadius:6,marginBottom:14,lineHeight:1.8}}>
-          <div style={{color:"#f8fafc",fontWeight:700,marginBottom:4}}>DEBUG SEMANAL</div>
-          <div>csvUrl: <b style={{color:dbg.csvUrl?"#4ade80":"#f87171"}}>{String(dbg.csvUrl)}</b> | metaId: <b style={{color:dbg.metaId?"#4ade80":"#f87171"}}>{String(dbg.metaId)}</b> | metaToken: <b style={{color:dbg.metaToken?"#4ade80":"#f87171"}}>{String(dbg.metaToken)}</b></div>
-          <div>salesCount (M6 planilha): <b style={{color:"#fbbf24"}}>{dbg.salesCount}</b></div>
-          <div>metaDailyCount (após filtro M6): <b style={{color:"#fbbf24"}}>{dbg.metaDailyCount}</b></div>
-          <div>metaNomes: <b style={{color:"#60a5fa"}}>{dbg.metaNomes.length ? dbg.metaNomes.join(" | ") : "—"}</b></div>
-          <div>cicloKeys: <b style={{color:"#60a5fa"}}>{dbg.cicloKeys.length ? dbg.cicloKeys.join(", ") : "—"}</b></div>
-          <div>spendMap: <b style={{color:"#4ade80"}}>{Object.keys(dbg.spendMap).length ? JSON.stringify(dbg.spendMap) : "—"}</b></div>
-        </div>
-      )}
 
       {error && (
         <div style={{background:"#fef2f2",border:`1px solid #fca5a5`,borderRadius:5,padding:"9px 14px",marginBottom:16,color:C.red,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>⚠ {error}</div>
