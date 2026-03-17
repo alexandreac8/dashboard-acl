@@ -267,9 +267,10 @@ function crunchAll(metaAds, salesRows, from, to) {
     cm.ctr=cClicks>0&&cImp>0?(cClicks/cImp)*100:null;
 
     const adsets=[];
-    const allAdsets=new Set([...Object.keys(cAdsets),...cSales.map(s=>s.adset).filter(Boolean)]);
+    const FALLBACK_ADSET="(sem UTM)";
+    const allAdsets=new Set([...Object.keys(cAdsets),...cSales.map(s=>s.adset||FALLBACK_ADSET)]);
     for(const adset of allAdsets){
-      const aSales=cSales.filter(s=>s.adset===adset);
+      const aSales=adset===FALLBACK_ADSET?cSales.filter(s=>!s.adset):cSales.filter(s=>s.adset===adset);
       const aMeta=cAdsets[adset]||{};
       let asp=0,aim=0,acl=0,ald=0;
       for(const m of Object.values(aMeta))
@@ -278,9 +279,10 @@ function crunchAll(metaAds, salesRows, from, to) {
       am.ctr=acl>0&&aim>0?(acl/aim)*100:null;
 
       const creatives=[];
-      const allCr=new Set([...Object.keys(aMeta),...aSales.map(s=>s.creative).filter(Boolean)]);
+      const FALLBACK_CR="(sem criativo)";
+      const allCr=new Set([...Object.keys(aMeta),...aSales.map(s=>s.creative||FALLBACK_CR)]);
       for(const cr of allCr){
-        const crS=aSales.filter(s=>s.creative===cr);
+        const crS=cr===FALLBACK_CR?aSales.filter(s=>!s.creative):aSales.filter(s=>s.creative===cr);
         const crM=aMeta[cr]||{spend:0,impressions:0,clicks:0,leads:0};
         const crm=calc(crS,crM.spend,crM.leads);
         crm.ctr=crM.clicks>0&&crM.impressions>0?(crM.clicks/crM.impressions)*100:null;
