@@ -293,16 +293,21 @@ function crunchAll(metaAds, salesRows, from, to) {
 async function fetchMetaAds(cfg,from,to){
   const fields="campaign_name,adset_name,ad_name,spend,impressions,clicks,actions";
   const timeRange=encodeURIComponent(JSON.stringify({since:from,until:to}));
-  const url=`https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&level=ad&limit=500&access_token=${cfg.metaToken}`;
-  const res=await fetch(url); const data=await res.json();
-  if(data.error) throw new Error(`Meta API: ${data.error.message}`);
-  return (data.data||[])
-    .filter(r=>r.campaign_name&&r.campaign_name.toUpperCase().includes("M5"))
-    .map(r=>({
-      campaign_name:r.campaign_name, adset_name:r.adset_name, ad_name:r.ad_name,
-      spend:parseFloat(r.spend||0), impressions:parseInt(r.impressions||0), clicks:parseInt(r.clicks||0),
-      leads:parseInt((r.actions||[]).find(a=>a.action_type==="lead")?.value||0),
-    }));
+  const filtering=encodeURIComponent(JSON.stringify([{field:"campaign.name",operator:"CONTAIN",value:"M5"}]));
+  const baseUrl=`https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&level=ad&filtering=${filtering}&limit=500&access_token=${cfg.metaToken}`;
+  const all=[];
+  let url=baseUrl;
+  while(url){
+    const res=await fetch(url); const data=await res.json();
+    if(data.error) throw new Error(`Meta API: ${data.error.message}`);
+    all.push(...(data.data||[]));
+    url=data.paging?.next||null;
+  }
+  return all.map(r=>({
+    campaign_name:r.campaign_name, adset_name:r.adset_name, ad_name:r.ad_name,
+    spend:parseFloat(r.spend||0), impressions:parseInt(r.impressions||0), clicks:parseInt(r.clicks||0),
+    leads:parseInt((r.actions||[]).find(a=>a.action_type==="lead")?.value||0),
+  }));
 }
 
 async function fetchSheets(cfg,preco){
