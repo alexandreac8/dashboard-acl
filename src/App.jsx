@@ -720,7 +720,12 @@ async function fetchMetaM6Daily(cfg) {
   const res  = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(`Meta API: ${data.error.message}`);
-  return (data.data || []).filter(r => r.campaign_name && r.campaign_name.toUpperCase().includes("M6"));
+  const all = data.data || [];
+  console.log("[M6] total campanhas da API:", all.length);
+  console.log("[M6] nomes únicos:", [...new Set(all.map(r => r.campaign_name))]);
+  const filtered = all.filter(r => r.campaign_name && r.campaign_name.toUpperCase().includes("M6"));
+  console.log("[M6] após filtro 'M6':", filtered.length);
+  return filtered;
 }
 
 function getCaptureDatesForCiclo(cicloTag) {
@@ -782,7 +787,9 @@ function SemanalPanel({ cfg, preco }) {
       if (cfg.metaAccountId && cfg.metaToken) {
         const metaDaily = await fetchMetaM6Daily(cfg);
         const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
+        console.log("[M6] cicloKeys da planilha:", cicloKeys);
         const sm = assignSpendToCycles(metaDaily, cicloKeys);
+        console.log("[M6] spendMap resultante:", sm);
         setSpendMap(sm);
       }
       setLoaded(true);
