@@ -720,6 +720,7 @@ async function fetchMetaM6Daily(cfg) {
   const res  = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(`Meta API: ${data.error.message}`);
+  console.log("Meta M6 raw:", data.data?.length, data.data?.slice(0,3));
   return (data.data || []).filter(r => r.campaign_name && r.campaign_name.toUpperCase().includes("M6"));
 }
 
