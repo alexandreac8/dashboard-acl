@@ -164,13 +164,13 @@ async function fetchSheetsGads(cfg, preco) {
 
 // ── Semanal date helpers ──────────────────────────────────────────────────────
 function parseCicloDate(ciclo) {
-  // "QUI-12/03/26" → Date | null
+  // "QUI-12/03/26" → Date | null  (local midnight — evita offset UTC)
   if (!ciclo) return null;
   const idx = ciclo.indexOf("-");
   if (idx === -1) return null;
   const [d, m, y] = ciclo.slice(idx + 1).split("/");
   if (!d || !m || !y) return null;
-  return new Date(`20${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
+  return new Date(parseInt(`20${y}`), parseInt(m) - 1, parseInt(d));
 }
 
 function isSameDay(d1, d2) {
@@ -720,7 +720,6 @@ async function fetchMetaM6Daily(cfg) {
   const res  = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(`Meta API: ${data.error.message}`);
-  console.log("Meta M6 raw:", data.data?.length, data.data?.slice(0,3));
   return (data.data || []).filter(r => r.campaign_name && r.campaign_name.toUpperCase().includes("M6"));
 }
 
@@ -741,16 +740,22 @@ function getCaptureDatesForCiclo(cicloTag) {
   return { start, end: webinarDate };
 }
 
+function fmtLocalDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
 function assignSpendToCycles(metaDailyRows, cycleKeys) {
   // Para cada ciclo, soma o gasto dos dias dentro do período de captura
+  // Usa comparação de strings para evitar bug de timezone UTC vs local
   const spendMap = {};
   for (const ciclo of cycleKeys) {
     const range = getCaptureDatesForCiclo(ciclo);
     if (!range) { spendMap[ciclo] = 0; continue; }
+    const startStr = fmtLocalDate(range.start);
+    const endStr   = fmtLocalDate(range.end);
     let total = 0;
     for (const r of metaDailyRows) {
-      const d = new Date(r.date_start);
-      if (d >= range.start && d <= range.end) {
+      if (r.date_start >= startStr && r.date_start <= endStr) {
         total += parseFloat(r.spend || 0);
       }
     }
@@ -778,9 +783,6 @@ function SemanalPanel({ cfg, preco }) {
         const metaDaily = await fetchMetaM6Daily(cfg);
         const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
         const sm = assignSpendToCycles(metaDaily, cicloKeys);
-        console.log("metaDaily M6:", metaDaily.length, metaDaily.slice(0,3));
-        console.log("cicloKeys:", cicloKeys);
-        console.log("spendMap:", sm);
         setSpendMap(sm);
       }
       setLoaded(true);
@@ -945,13 +947,12 @@ async function fetchSheetsSemanal(cfg, preco) {
       const ciclo = (r[8]||"").trim();
       const saleDate = parseDate((r[0]||"").trim());
       const webinarDate = parseCicloDate(ciclo);
-      const saleDateObj = saleDate ? new Date(saleDate) : null;
       return {
         ciclo_sem: ciclo,
         sale_date: saleDate,
         campaign: r[2]||"",
         value: preco,
-        is_pitch: webinarDate && saleDateObj ? isSameDay(saleDateObj, webinarDate) : false,
+        is_pitch: webinarDate ? (saleDate === fmtLocalDate(webinarDate)) : false,
       };
     });
 }
