@@ -28,17 +28,17 @@ export default async function handler(req, res) {
     };
 
     // 2. listAccessibleCustomers
-    const r1 = await fetch("https://googleads.googleapis.com/v19/customers:listAccessibleCustomers", {
+    const r1 = await fetch("https://googleads.googleapis.com/v18/customers:listAccessibleCustomers", {
       headers: { "Authorization": `Bearer ${tokenData.access_token}`, "developer-token": process.env.GADS_DEVELOPER_TOKEN },
     });
     results.listAccessible = { status: r1.status, body: await r1.text() };
 
     // 3. GET customer info
-    const r2 = await fetch("https://googleads.googleapis.com/v19/customers/1310129916", { headers });
+    const r2 = await fetch("https://googleads.googleapis.com/v18/customers/1310129916", { headers });
     results.customerInfo = { status: r2.status, body: await r2.text() };
 
     // 4. search campaigns
-    const r3 = await fetch("https://googleads.googleapis.com/v19/customers/1310129916/googleAds:search", {
+    const r3 = await fetch("https://googleads.googleapis.com/v18/customers/1310129916/googleAds:search", {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ query: "SELECT campaign.id, campaign.name, campaign.status FROM campaign LIMIT 5" }),
