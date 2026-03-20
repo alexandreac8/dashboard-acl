@@ -44,9 +44,17 @@ const GLOBAL_CSS = `
     .date-row { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
     .date-inputs { flex-wrap: wrap !important; gap: 6px !important; }
 
-    /* KPI boxes */
+    /* PriceWidget — quebra em duas linhas */
+    .price-widget { flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; }
+
+    /* ModeToggle — vertical */
+    .mode-toggle { flex-direction: column !important; }
+
+    /* KPI section — financeiro full width, roas+leads em linha, projeção oculta */
     .kpi-section { flex-wrap: wrap !important; }
-    .kpi-section > div { min-width: calc(50% - 5px) !important; }
+    .kpi-financial { flex: 1 1 100% !important; min-width: 100% !important; }
+    .kpi-roas, .kpi-leads { flex: 1 1 calc(50% - 5px) !important; min-width: calc(50% - 5px) !important; }
+    .kpi-proj { display: none !important; }
 
     /* Tabela — scroll horizontal, campanha sticky */
     .table-wrap { -webkit-overflow-scrolling: touch; }
@@ -434,7 +442,7 @@ function CvrBadge({v}){
 
 function ModeToggle({mode,onChange}){
   return(
-    <div style={{display:"flex",gap:4,background:C.surf,border:`1px solid ${C.border}`,borderRadius:6,padding:3}}>
+    <div className="mode-toggle" style={{display:"flex",gap:4,background:C.surf,border:`1px solid ${C.border}`,borderRadius:6,padding:3}}>
       {[["capture","📅 Por Captura"],["caixa","💰 Acumulado"]].map(([k,l])=>(
         <button key={k} className="btn-mode" onClick={()=>onChange(k)} style={{
           padding:"5px 14px",borderRadius:4,border:"none",cursor:"pointer",
@@ -458,8 +466,8 @@ function PriceWidget({preco,onChange}){
     setEditing(false);
   };
   return(
-    <div style={{display:"flex",alignItems:"center",gap:8,background:"#f8fafc",border:`1px solid ${C.border2}`,borderRadius:6,padding:"6px 12px"}}>
-      <span style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Preço do Produto</span>
+    <div className="price-widget" style={{display:"flex",alignItems:"center",gap:8,background:"#f8fafc",border:`1px solid ${C.border2}`,borderRadius:6,padding:"6px 12px"}}>
+      <span className="price-label" style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Preço do Produto</span>
       {editing?(
         <>
           <span style={{color:C.muted,fontSize:11}}>R$</span>
@@ -1568,7 +1576,7 @@ export default function Dashboard(){
                 <div className="kpi-section" style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
 
                   {/* BOX FINANCEIRO UNIFICADO */}
-                  <div style={{flex:"1.2 1 0",minWidth:200,background:C.card,border:`1.5px solid ${C.border2}`,borderRadius:8,padding:"14px 16px",display:"flex",flexDirection:"column",gap:6}}>
+                  <div className="kpi-financial" style={{flex:"1.2 1 0",minWidth:200,background:C.card,border:`1.5px solid ${C.border2}`,borderRadius:8,padding:"14px 16px",display:"flex",flexDirection:"column",gap:6}}>
                     <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
                       <span style={{fontSize:12,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:"nowrap"}}>Gasto:</span>
                       <span style={{fontSize:14,fontWeight:700,color:C.red,fontFamily:"'JetBrains Mono',monospace"}}>−{fmt.brl(totSpend)}</span>
@@ -1585,14 +1593,14 @@ export default function Dashboard(){
                   </div>
 
                   {/* ROAS — segundo box */}
-                  <div style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${roasColor(roas)}44`,borderRadius:6,padding:"14px 16px"}}>
+                  <div className="kpi-roas" style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${roasColor(roas)}44`,borderRadius:6,padding:"14px 16px"}}>
                     <KPI label={`ROAS · ${isCap?"Captura":"Acumulado"}`} value={fmt.x(roas)} color={roasColor(roas)}
                       sub={`CPA ${fmt.brl(isCap?totSalesCap>0?totSpend/totSalesCap:null:totSalesSale>0?totSpend/totSalesSale:null)}`}
                       labelSize={11} valueSize={28} subSize={13}/>
                   </div>
 
                   {/* LEADS + CPL */}
-                  <div style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${C.teal}44`,borderRadius:6,padding:"14px 16px"}}>
+                  <div className="kpi-leads" style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${C.teal}44`,borderRadius:6,padding:"14px 16px"}}>
                     <KPI label="Leads" value={fmt.num(totLeads)} color={C.teal}
                       sub={`CPL ${fmt.brl(cpl)}`} subColor={C.gold}
                       labelSize={11} valueSize={28} subSize={13}/>
@@ -1606,7 +1614,7 @@ export default function Dashboard(){
                     const roasFinal  = totSpend > 0 ? (totRevCap + revProj) / totSpend : null;
                     const rcol       = roasFinal>=1 ? C.green : C.red;
                     return (
-                      <div style={{
+                      <div className="kpi-proj" style={{
                         flex:"2 1 0",minWidth:200,
                         background:"#f8fafc", border:`1px solid ${C.border}`,
                         borderRadius:6, padding:"14px 16px",
