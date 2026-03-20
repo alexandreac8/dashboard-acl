@@ -1541,25 +1541,20 @@ export default function Dashboard(){
                 <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
 
                   {/* BOX FINANCEIRO UNIFICADO */}
-                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"18px 28px",display:"flex",alignItems:"center",gap:0}}>
-                    {/* Custo Total */}
-                    <div style={{flex:1,textAlign:"center"}}>
-                      <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>Custo Total</div>
-                      <div style={{fontSize:20,fontWeight:600,color:C.red,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.brl(totSpend)}</div>
+                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"16px 28px",display:"flex",alignItems:"center",justifyContent:"center",gap:32}}>
+                    <div style={{display:"flex",alignItems:"baseline",gap:10}}>
+                      <span style={{fontSize:14,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Gasto:</span>
+                      <span style={{fontSize:22,fontWeight:700,color:C.red,fontFamily:"'JetBrains Mono',monospace"}}>−{fmt.brl(totSpend)}</span>
                     </div>
-                    <div style={{width:1,background:C.border,alignSelf:"stretch",margin:"0 24px"}}/>
-                    {/* Vendas */}
-                    <div style={{flex:1,textAlign:"center"}}>
-                      <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>{isCap?"Vendas · Captura":"Vendas · Acumulado"}</div>
-                      <div style={{fontSize:20,fontWeight:600,color:C.green,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.brl(rev)}</div>
-                      <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:4}}>{fmt.num(sales)} vendas</div>
+                    <div style={{width:1,background:C.border,height:32}}/>
+                    <div style={{display:"flex",alignItems:"baseline",gap:10}}>
+                      <span style={{fontSize:14,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Vendas:</span>
+                      <span style={{fontSize:22,fontWeight:700,color:C.green,fontFamily:"'JetBrains Mono',monospace"}}>+{fmt.brl(rev)}</span>
                     </div>
-                    <div style={{width:1,background:C.border,alignSelf:"stretch",margin:"0 24px"}}/>
-                    {/* LUCRO */}
-                    <div style={{flex:1,textAlign:"center"}}>
-                      <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>Lucro</div>
-                      <div style={{fontSize:30,fontWeight:800,color:lucroColor,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.brl(lucro)}</div>
-                      <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:4}}>margem {fmt.pct(rev>0?(lucro/rev)*100:null)}</div>
+                    <div style={{width:1,background:C.border,height:32}}/>
+                    <div style={{display:"flex",alignItems:"baseline",gap:10}}>
+                      <span style={{fontSize:16,fontWeight:800,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>LUCRO:</span>
+                      <span style={{fontSize:28,fontWeight:800,color:lucroColor,fontFamily:"'JetBrains Mono',monospace"}}>{lucro>=0?"+":""}{fmt.brl(lucro)}</span>
                     </div>
                   </div>
 
