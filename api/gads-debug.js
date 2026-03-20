@@ -18,20 +18,15 @@ export default async function handler(req, res) {
       return res.status(500).json({ step: "token", error: tokenData });
     }
 
-    // 2. Listar clientes acessíveis via MCC
+    // 2. Listar clientes acessíveis
     const listRes = await fetch(
-      "https://googleads.googleapis.com/v19/customers/6994391072/googleAds:searchStream",
+      "https://googleads.googleapis.com/v19/customers:listAccessibleCustomers",
       {
-        method: "POST",
+        method: "GET",
         headers: {
-          "Authorization":     `Bearer ${tokenData.access_token}`,
-          "developer-token":   process.env.GADS_DEVELOPER_TOKEN,
-          "login-customer-id": "6994391072",
-          "Content-Type":      "application/json",
+          "Authorization":   `Bearer ${tokenData.access_token}`,
+          "developer-token": process.env.GADS_DEVELOPER_TOKEN,
         },
-        body: JSON.stringify({
-          query: `SELECT customer.id, customer.descriptive_name, customer.status FROM customer LIMIT 10`,
-        }),
       }
     );
     const listData = await listRes.json();
