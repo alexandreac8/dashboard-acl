@@ -1614,8 +1614,8 @@ export default function Dashboard(){
                     );
                   })()}
 
-                  </div>{/* fim grid inferior */}
-                </div>{/* fim flex column */}
+                  </div>
+                </div>
               );
             })()}
 
