@@ -2,6 +2,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   try {
+    // 1. Obter access token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -17,46 +18,22 @@ export default async function handler(req, res) {
       return res.status(500).json({ step: "token", error: tokenData });
     }
 
-    const headers = {
-      "Authorization":     `Bearer ${tokenData.access_token}`,
-      "developer-token":   process.env.GADS_DEVELOPER_TOKEN,
-      "login-customer-id": "6994391072",
-      "Content-Type":      "application/json",
-    };
-
-    // Raw searchStream — qualquer campanha, qualquer data
-    const r = await fetch(
-      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream",
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          query: "SELECT campaign.id, campaign.name, campaign.status FROM campaign LIMIT 10",
-        }),
-      }
+    // 2. Verificar scopes do token
+    const infoRes = await fetch(
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${tokenData.access_token}`
     );
-    const raw = await r.text();
+    const tokenInfo = await infoRes.json();
 
-    // Também testa sem login-customer-id
-    const r2 = await fetch(
-      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream",
-      {
-        method: "POST",
-        headers: {
-          "Authorization":   `Bearer ${tokenData.access_token}`,
-          "developer-token": process.env.GADS_DEVELOPER_TOKEN,
-          "Content-Type":    "application/json",
-        },
-        body: JSON.stringify({
-          query: "SELECT campaign.id, campaign.name, campaign.status FROM campaign LIMIT 10",
-        }),
-      }
-    );
-    const raw2 = await r2.text();
+    // 3. Verificar env vars (parcial)
+    const devToken = process.env.GADS_DEVELOPER_TOKEN || "";
 
     return res.status(200).json({
-      with_login_customer_id: { status: r.status, raw },
-      without_login_customer_id: { status: r2.status, raw: raw2 },
+      token_ok: true,
+      scopes: tokenInfo.scope,
+      email: tokenInfo.email,
+      dev_token_length: devToken.length,
+      dev_token_preview: devToken.slice(0, 6) + "...",
+      refresh_token_preview: (process.env.GADS_REFRESH_TOKEN || "").slice(0, 10) + "...",
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
