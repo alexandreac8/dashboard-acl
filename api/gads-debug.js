@@ -1,7 +1,34 @@
+import https from "https";
+
+function httpsPost(hostname, path, headers, body) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const options = {
+      hostname,
+      path,
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type":   "application/json",
+        "Content-Length": Buffer.byteLength(data),
+      },
+    };
+    const req = https.request(options, (resp) => {
+      let raw = "";
+      resp.on("data", chunk => { raw += chunk; });
+      resp.on("end", () => resolve({ status: resp.statusCode, body: raw }));
+    });
+    req.on("error", reject);
+    req.write(data);
+    req.end();
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   try {
+    // 1. Token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -15,44 +42,42 @@ export default async function handler(req, res) {
     const { access_token } = await tokenRes.json();
     if (!access_token) return res.status(500).json({ error: "no token" });
 
-    // Teste 1: sem auth (deve retornar 401, não 501)
-    const r1 = await fetch("https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "SELECT campaign.id FROM campaign LIMIT 1" }),
-    });
-    const t1 = await r1.text();
+    const query = "SELECT campaign.id, campaign.name FROM campaign LIMIT 1";
 
-    // Teste 2: com auth mas sem developer-token (deve retornar erro específico)
-    const r2 = await fetch("https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${access_token}`,
-        "Content-Type":  "application/json",
-      },
-      body: JSON.stringify({ query: "SELECT campaign.id FROM campaign LIMIT 1" }),
-    });
-    const t2 = await r2.text();
-
-    // Teste 3: completo com developer-token
-    const r3 = await fetch("https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream", {
-      method: "POST",
-      headers: {
-        "Authorization":     `Bearer ${access_token}`,
+    // Teste via https nativo (evita qualquer quirk do fetch/undici)
+    const r1 = await httpsPost(
+      "googleads.googleapis.com",
+      "/v19/customers/1310129916/googleAds:searchStream",
+      {
+        "authorization":     `Bearer ${access_token}`,
         "developer-token":   process.env.GADS_DEVELOPER_TOKEN,
         "login-customer-id": "6994391072",
-        "Content-Type":      "application/json",
       },
-      body: JSON.stringify({ query: "SELECT campaign.id FROM campaign LIMIT 1" }),
-    });
-    const t3 = await r3.text();
+      { query }
+    );
+
+    // Teste fetch com X-Goog-Api-Client
+    const r2 = await fetch(
+      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream",
+      {
+        method: "POST",
+        headers: {
+          "Authorization":       `Bearer ${access_token}`,
+          "developer-token":     process.env.GADS_DEVELOPER_TOKEN,
+          "login-customer-id":   "6994391072",
+          "Content-Type":        "application/json",
+          "X-Goog-Api-Client":   "gl-node/18.0.0",
+        },
+        body: JSON.stringify({ query }),
+      }
+    );
+    const t2 = await r2.text();
 
     return res.status(200).json({
-      sem_auth:     { status: r1.status, body: t1.slice(0, 300) },
-      sem_devtoken: { status: r2.status, body: t2.slice(0, 300) },
-      completo:     { status: r3.status, body: t3.slice(0, 300) },
+      https_nativo: { status: r1.status, body: r1.body.slice(0, 400) },
+      fetch_com_xgoog: { status: r2.status, body: t2.slice(0, 400) },
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, stack: err.stack?.slice(0, 300) });
   }
 }
