@@ -1541,19 +1541,18 @@ export default function Dashboard(){
                 <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
 
                   {/* BOX FINANCEIRO UNIFICADO */}
-                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"16px 28px",display:"flex",alignItems:"center",justifyContent:"center",gap:32}}>
-                    <div style={{display:"flex",alignItems:"baseline",gap:10}}>
-                      <span style={{fontSize:14,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Gasto:</span>
+                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"18px 28px",display:"flex",flexDirection:"column",gap:8}}>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
+                      <span style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Gasto:</span>
                       <span style={{fontSize:22,fontWeight:700,color:C.red,fontFamily:"'JetBrains Mono',monospace"}}>−{fmt.brl(totSpend)}</span>
                     </div>
-                    <div style={{width:1,background:C.border,height:32}}/>
-                    <div style={{display:"flex",alignItems:"baseline",gap:10}}>
-                      <span style={{fontSize:14,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Vendas:</span>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
+                      <span style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Vendas:</span>
                       <span style={{fontSize:22,fontWeight:700,color:C.green,fontFamily:"'JetBrains Mono',monospace"}}>+{fmt.brl(rev)}</span>
                     </div>
-                    <div style={{width:1,background:C.border,height:32}}/>
-                    <div style={{display:"flex",alignItems:"baseline",gap:10}}>
-                      <span style={{fontSize:16,fontWeight:800,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>LUCRO:</span>
+                    <div style={{height:1,background:C.border,margin:"2px 0"}}/>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
+                      <span style={{fontSize:17,fontWeight:800,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>LUCRO:</span>
                       <span style={{fontSize:28,fontWeight:800,color:lucroColor,fontFamily:"'JetBrains Mono',monospace"}}>{lucro>=0?"+":""}{fmt.brl(lucro)}</span>
                     </div>
                   </div>
