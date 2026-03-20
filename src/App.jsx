@@ -28,6 +28,34 @@ const GLOBAL_CSS = `
   .chevron { transition: transform 0.22s cubic-bezier(0.16,1,0.3,1); display: inline-block; }
   .chevron.open { transform: rotate(90deg); }
   .price-input:focus { outline: 1px solid #2563eb; border-color: #2563eb !important; }
+
+  /* ── MOBILE ── */
+  @media (max-width: 640px) {
+    /* Topbar */
+    .topbar { height: auto !important; flex-direction: column !important; align-items: flex-start !important; padding: 10px 14px !important; gap: 8px !important; }
+    .topbar-center { position: static !important; transform: none !important; display: flex !important; overflow-x: auto !important; width: 100% !important; padding-bottom: 2px; gap: 6px !important; }
+    .topbar-center::-webkit-scrollbar { height: 0; }
+    .topbar-right { width: 100%; display: flex; justify-content: flex-end; }
+
+    /* Padding geral */
+    .main-pad { padding: 12px 12px !important; }
+
+    /* Filtros de data */
+    .date-row { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+    .date-inputs { flex-wrap: wrap !important; gap: 6px !important; }
+
+    /* KPI boxes */
+    .kpi-section { flex-wrap: wrap !important; }
+    .kpi-section > div { min-width: calc(50% - 5px) !important; }
+
+    /* Tabela — scroll horizontal, campanha sticky */
+    .table-wrap { -webkit-overflow-scrolling: touch; }
+    .col-camp { position: sticky !important; left: 0 !important; background: inherit !important; z-index: 2 !important; }
+    .col-camp-th { position: sticky !important; left: 36px !important; background: #fff !important; z-index: 3 !important; }
+
+    /* Oculta colunas menos importantes no mobile */
+    .hide-mobile { display: none !important; }
+  }
 `;
 
 const C = {
@@ -613,7 +641,7 @@ function CampaignRow({camp,mode,idx,acaoMode}){
         <td style={{padding:"13px 14px",width:36}}>
           <span className={`chevron${open?" open":""}`} style={{color:open?C.blue:C.muted,fontSize:11}}>▶</span>
         </td>
-        <td style={{padding:"13px 14px"}}>
+        <td className="col-camp" style={{padding:"13px 14px"}}>
           <span className="camp-name" style={{color:open?C.blue:"#1e293b",fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,fontWeight:500,transition:"color 0.1s"}}>{camp.name}</span>
           <div style={{marginTop:3,fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1}}>
             {camp.adsets.length} conjuntos · {camp.adsets.reduce((s,a)=>s+a.creatives.length,0)} criativos
@@ -622,10 +650,10 @@ function CampaignRow({camp,mode,idx,acaoMode}){
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.red}}>{fmt.brl(camp.spend)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.num(camp.leads)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.brl(camp.cpl)}</td>
-        <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.pct(camp.ctr)}</td>
+        <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.pct(camp.ctr)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green}}>{fmt.brl(rev)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.text}}>{fmt.num(sales)}</td>
-        <td style={{padding:"13px 14px",textAlign:"right"}}><CvrBadge v={camp.cvr}/></td>
+        <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right"}}><CvrBadge v={camp.cvr}/></td>
         <td style={{padding:"13px 14px",textAlign:"right",background:roasBg,borderRadius:4}}><RoasBadge v={roas}/></td>
         {!isCap&&<td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{camp.avgDays!=null?`${Math.round(camp.avgDays)}d`:"—"}</td>}
       </tr>
@@ -1441,41 +1469,40 @@ export default function Dashboard(){
       <style>{GLOBAL_CSS}</style>
 
       {/* TOPBAR */}
-      <div style={{borderBottom:`1px solid ${C.border}`,background:C.surf,height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",position:"relative"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <img src="https://academiadelibras.com/wp-content/uploads/2020/12/Logotipo-Horizontal-Roxo-pq.png" alt="Academia de Libras" style={{height:26,objectFit:"contain"}}/>
-
-          {isDemo&&<span style={{fontSize:8,background:"#fef3c7",color:"#92400e",padding:"2px 8px",borderRadius:3,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace"}}>DEMO</span>}
-          {loading&&<span style={{fontSize:9,color:C.blue,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",opacity:0.7}}>carregando…</span>}
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <div style={{display:"flex",gap:6,position:"absolute",left:"50%",transform:"translateX(-50%)"}}>
-            {[
-              {k:"perpetuo", l:"META PERPÉTUO", color:"#3b82f6"},
-              {k:"semanal",  l:"META SEMANAL",  color:"#3b82f6"},
-              {k:"diario",   l:"GOOGLE ADW",    color:"#c2410c"},
-            ].map(({k,l,color})=>(
-              <button key={k} onClick={()=>{setTab(k);if(page==="cfg")setPage("dash");}} style={{
-                padding:"6px 16px",borderRadius:5,cursor:"pointer",
-                border:`1.5px solid ${tab===k ? color : color+"55"}`,
-                background:tab===k ? color+"15" : "transparent",
-                color:tab===k ? color : color+"88",
-                fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:1.5,fontWeight:tab===k?700:500,
-                transition:"all 0.15s",
-              }}>{l}</button>
-            ))}
+      <div className="topbar" style={{borderBottom:`1px solid ${C.border}`,background:C.surf,height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",position:"relative"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+            <img src="https://academiadelibras.com/wp-content/uploads/2020/12/Logotipo-Horizontal-Roxo-pq.png" alt="Academia de Libras" style={{height:26,objectFit:"contain"}}/>
+            {isDemo&&<span style={{fontSize:8,background:"#fef3c7",color:"#92400e",padding:"2px 8px",borderRadius:3,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace"}}>DEMO</span>}
+            {loading&&<span style={{fontSize:9,color:C.blue,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",opacity:0.7}}>carregando…</span>}
           </div>
           <button onClick={()=>{
             if(page==="cfg"){setPage("dash");}
             else{setPassInput("");setPassErr(false);setShowPassModal(true);}
           }} style={{
             padding:"6px 10px",background:"transparent",border:`1px solid ${C.border}`,
-            color:"#64748b",borderRadius:4,cursor:"pointer",fontSize:14,
+            color:"#64748b",borderRadius:4,cursor:"pointer",fontSize:14,flexShrink:0,
           }}>{page==="cfg"?"←":"⚙"}</button>
+        </div>
+        <div className="topbar-center" style={{display:"flex",gap:6,position:"absolute",left:"50%",transform:"translateX(-50%)"}}>
+          {[
+            {k:"perpetuo", l:"META PERPÉTUO", color:"#3b82f6"},
+            {k:"semanal",  l:"META SEMANAL",  color:"#3b82f6"},
+            {k:"diario",   l:"GOOGLE ADW",    color:"#c2410c"},
+          ].map(({k,l,color})=>(
+            <button key={k} onClick={()=>{setTab(k);if(page==="cfg")setPage("dash");}} style={{
+              padding:"6px 16px",borderRadius:5,cursor:"pointer",whiteSpace:"nowrap",
+              border:`1.5px solid ${tab===k ? color : color+"55"}`,
+              background:tab===k ? color+"15" : "transparent",
+              color:tab===k ? color : color+"88",
+              fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:1.5,fontWeight:tab===k?700:500,
+              transition:"all 0.15s",
+            }}>{l}</button>
+          ))}
         </div>
       </div>
 
-      <div style={{padding:"22px 24px",maxWidth:1440,margin:"0 auto"}}>
+      <div className="main-pad" style={{padding:"22px 24px",maxWidth:1440,margin:"0 auto"}}>
         {page==="cfg"?(
           <div className="fade-up">
             <ConfigPanel cfg={cfg} onSave={c=>{setCfg(c);setPage("dash");load(c,from,to,preco);}}/>
@@ -1492,8 +1519,8 @@ export default function Dashboard(){
           <div className="fade-up">
 
             {/* DATE + MODE + PREÇO */}
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap",justifyContent:"space-between"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <div className="date-row" style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap",justifyContent:"space-between"}}>
+              <div className="date-inputs" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                 <span style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Período</span>
                 {[
                   {l:"HOJE",   f:today(),      t:today(),      ac:false},
@@ -1538,7 +1565,7 @@ export default function Dashboard(){
               const lucro = rev - totSpend;
               const lucroColor = lucro>0?C.green:lucro<0?C.red:C.muted;
               return(
-                <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+                <div className="kpi-section" style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
 
                   {/* BOX FINANCEIRO UNIFICADO */}
                   <div style={{flex:"1.2 1 0",minWidth:200,background:C.card,border:`1.5px solid ${C.border2}`,borderRadius:8,padding:"14px 16px",display:"flex",flexDirection:"column",gap:6}}>
@@ -1621,15 +1648,19 @@ export default function Dashboard(){
                 </div>
                 <span style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>visão: {isCap?"por captura":"acumulado/caixa"}</span>
               </div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",minWidth:860}}>
+              <div className="table-wrap" style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
                   <thead style={{position:"relative",zIndex:10}}>
                     <tr style={{borderBottom:`1px solid ${C.border}`}}>
                       <th style={{width:36}}/>
-                      <th style={{padding:"9px 14px",textAlign:"left",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Campanha</th>
-                      {["Gasto","Leads","CPL","CTR","Faturamento","Vendas","Lead→Venda"].map(h=>(
+                      <th className="col-camp-th" style={{padding:"9px 14px",textAlign:"left",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Campanha</th>
+                      {["Gasto","Leads","CPL"].map(h=>(
                         <th key={h} style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>{h}</th>
                       ))}
+                      <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>CTR</th>
+                      <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Faturamento</th>
+                      <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Vendas</th>
+                      <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Lead→Venda</th>
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"88",fontFamily:"'JetBrains Mono',monospace"}}>ROAS</th>
                       {!isCap&&<th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>⏱ CV</th>}
                     </tr>
