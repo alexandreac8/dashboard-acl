@@ -376,14 +376,14 @@ async function fetchSheets(cfg,preco){
 }
 
 // ── UI atoms ──────────────────────────────────────────────────────────────────
-function KPI({label,value,color,sub,subColor,darkBg}){
+function KPI({label,value,color,sub,subColor,darkBg,labelSize,valueSize,subSize}){
   const labelClr = darkBg ? "rgba(255,255,255,0.45)" : C.muted;
   const subClr   = darkBg ? "rgba(255,255,255,0.35)" : (subColor||C.muted);
   return(
     <div style={{display:"flex",flexDirection:"column",gap:4}}>
-      <span style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:labelClr,fontFamily:"'JetBrains Mono',monospace"}}>{label}</span>
-      <span style={{fontSize:16,fontWeight:600,color:color||C.text,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{value}</span>
-      {sub&&<span style={{fontSize:10,color:subClr,fontFamily:"'JetBrains Mono',monospace"}}>{sub}</span>}
+      <span style={{fontSize:labelSize||8,letterSpacing:2,textTransform:"uppercase",color:labelClr,fontFamily:"'JetBrains Mono',monospace"}}>{label}</span>
+      <span style={{fontSize:valueSize||16,fontWeight:600,color:color||C.text,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{value}</span>
+      {sub&&<span style={{fontSize:subSize||10,color:subClr,fontFamily:"'JetBrains Mono',monospace"}}>{sub}</span>}
     </div>
   );
 }
@@ -1557,16 +1557,18 @@ export default function Dashboard(){
                     </div>
                   </div>
 
+                  {/* ROAS — segundo box */}
+                  <div style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${roasColor(roas)}44`,borderRadius:6,padding:"14px 16px"}}>
+                    <KPI label={`ROAS · ${isCap?"Captura":"Acumulado"}`} value={fmt.x(roas)} color={roasColor(roas)}
+                      sub={`CPA ${fmt.brl(isCap?totSalesCap>0?totSpend/totSalesCap:null:totSalesSale>0?totSpend/totSalesSale:null)}`}
+                      labelSize={11} valueSize={28} subSize={13}/>
+                  </div>
+
                   {/* LEADS + CPL */}
                   <div style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${C.teal}44`,borderRadius:6,padding:"14px 16px"}}>
                     <KPI label="Leads" value={fmt.num(totLeads)} color={C.teal}
-                      sub={`CPL ${fmt.brl(cpl)}`} subColor={C.gold}/>
-                  </div>
-
-                  {/* 5. ROAS — muda com o toggle */}
-                  <div style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${roasColor(roas)}44`,borderRadius:6,padding:"14px 16px"}}>
-                    <KPI label={`ROAS · ${isCap?"Captura":"Acumulado"}`} value={fmt.x(roas)} color={roasColor(roas)}
-                      sub={`CPA ${fmt.brl(isCap?totSalesCap>0?totSpend/totSalesCap:null:totSalesSale>0?totSpend/totSalesSale:null)}`}/>
+                      sub={`CPL ${fmt.brl(cpl)}`} subColor={C.gold}
+                      labelSize={11} valueSize={28} subSize={13}/>
                   </div>
 
                   {/* 6+7. PROJEÇÃO — só Captura, ao lado dos demais */}
