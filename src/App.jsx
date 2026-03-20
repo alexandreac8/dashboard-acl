@@ -1538,27 +1538,24 @@ export default function Dashboard(){
               const lucro = rev - totSpend;
               const lucroColor = lucro>0?C.green:lucro<0?C.red:C.muted;
               return(
-                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10,marginBottom:20}}>
 
                   {/* BOX FINANCEIRO UNIFICADO */}
-                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"18px 28px",display:"flex",flexDirection:"column",gap:8}}>
-                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-                      <span style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Gasto:</span>
-                      <span style={{fontSize:22,fontWeight:700,color:C.red,fontFamily:"'JetBrains Mono',monospace"}}>−{fmt.brl(totSpend)}</span>
+                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"14px 16px",display:"flex",flexDirection:"column",gap:6}}>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                      <span style={{fontSize:12,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:"nowrap"}}>Gasto:</span>
+                      <span style={{fontSize:14,fontWeight:700,color:C.red,fontFamily:"'JetBrains Mono',monospace"}}>−{fmt.brl(totSpend)}</span>
                     </div>
-                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-                      <span style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Vendas:</span>
-                      <span style={{fontSize:22,fontWeight:700,color:C.green,fontFamily:"'JetBrains Mono',monospace"}}>+{fmt.brl(rev)}</span>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                      <span style={{fontSize:12,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:"nowrap"}}>Vendas:</span>
+                      <span style={{fontSize:14,fontWeight:700,color:C.green,fontFamily:"'JetBrains Mono',monospace"}}>+{fmt.brl(rev)}</span>
                     </div>
                     <div style={{height:1,background:C.border,margin:"2px 0"}}/>
-                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-                      <span style={{fontSize:17,fontWeight:800,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>LUCRO:</span>
-                      <span style={{fontSize:28,fontWeight:800,color:lucroColor,fontFamily:"'JetBrains Mono',monospace"}}>{lucro>=0?"+":""}{fmt.brl(lucro)}</span>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                      <span style={{fontSize:13,fontWeight:800,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:"nowrap"}}>LUCRO:</span>
+                      <span style={{fontSize:18,fontWeight:800,color:lucroColor,fontFamily:"'JetBrains Mono',monospace"}}>{lucro>=0?"+":""}{fmt.brl(lucro)}</span>
                     </div>
                   </div>
-
-                  {/* LINHA INFERIOR: Leads, ROAS, Projeção */}
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
 
                   {/* LEADS + CPL */}
                   <div style={{background:C.card,border:`1px solid ${C.teal}44`,borderRadius:6,padding:"14px 16px"}}>
@@ -1608,7 +1605,6 @@ export default function Dashboard(){
                     );
                   })()}
 
-                  </div>
                 </div>
               );
             })()}
