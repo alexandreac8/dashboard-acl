@@ -1538,29 +1538,35 @@ export default function Dashboard(){
               const lucro = rev - totSpend;
               const lucroColor = lucro>0?C.green:lucro<0?C.red:C.muted;
               return(
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:20}}>
+                <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
 
-                  {/* 1. LUCRO */}
-                  <div style={{background:"#1e2330",border:`2px solid ${lucroColor}88`,borderRadius:6,padding:"14px 16px",position:"relative",overflow:"hidden",boxShadow:`0 4px 16px ${lucroColor}22`}}>
-                    <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${lucroColor}00,${lucroColor},${lucroColor}00)`}}/>
-                    <div style={{position:"absolute",bottom:0,right:0,width:60,height:60,background:lucroColor,opacity:0.05,borderRadius:"50%",transform:"translate(20px,20px)"}}/>
-                    <KPI label={`Lucro · ${isCap?"Captura":"Acumulado"}`} value={fmt.brl(lucro)} color={lucroColor}
-                      sub={`margem ${fmt.pct(rev>0?(lucro/rev)*100:null)}`} darkBg/>
+                  {/* BOX FINANCEIRO UNIFICADO */}
+                  <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"18px 28px",display:"flex",alignItems:"center",gap:0}}>
+                    {/* Custo Total */}
+                    <div style={{flex:1,textAlign:"center"}}>
+                      <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>Custo Total</div>
+                      <div style={{fontSize:20,fontWeight:600,color:C.red,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.brl(totSpend)}</div>
+                    </div>
+                    <div style={{width:1,background:C.border,alignSelf:"stretch",margin:"0 24px"}}/>
+                    {/* Vendas */}
+                    <div style={{flex:1,textAlign:"center"}}>
+                      <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>{isCap?"Vendas · Captura":"Vendas · Acumulado"}</div>
+                      <div style={{fontSize:20,fontWeight:600,color:C.green,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.brl(rev)}</div>
+                      <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:4}}>{fmt.num(sales)} vendas</div>
+                    </div>
+                    <div style={{width:1,background:C.border,alignSelf:"stretch",margin:"0 24px"}}/>
+                    {/* LUCRO */}
+                    <div style={{flex:1,textAlign:"center"}}>
+                      <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>Lucro</div>
+                      <div style={{fontSize:30,fontWeight:800,color:lucroColor,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.brl(lucro)}</div>
+                      <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:4}}>margem {fmt.pct(rev>0?(lucro/rev)*100:null)}</div>
+                    </div>
                   </div>
 
-                  {/* 2. FATURAMENTO */}
-                  <div style={{background:C.card,border:`2px solid ${C.green}55`,borderRadius:6,padding:"14px 16px",position:"relative",overflow:"hidden"}}>
-                    <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${C.green}00,${C.green},${C.green}00)`}}/>
-                    <KPI label={`Faturamento · ${isCap?"Captura":"Acumulado"}`} value={fmt.brl(rev)} color={C.green}
-                      sub={`${fmt.num(sales)} vendas`}/>
-                  </div>
+                  {/* LINHA INFERIOR: Leads, ROAS, Projeção */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
 
-                  {/* 3. GASTO */}
-                  <div style={{background:C.card,border:`1px solid ${C.red}44`,borderRadius:6,padding:"14px 16px"}}>
-                    <KPI label="Gasto Total" value={fmt.brl(totSpend)} color={C.red}/>
-                  </div>
-
-                  {/* 4. LEADS + CPL */}
+                  {/* LEADS + CPL */}
                   <div style={{background:C.card,border:`1px solid ${C.teal}44`,borderRadius:6,padding:"14px 16px"}}>
                     <KPI label="Leads" value={fmt.num(totLeads)} color={C.teal}
                       sub={`CPL ${fmt.brl(cpl)}`} subColor={C.gold}/>
@@ -1608,7 +1614,8 @@ export default function Dashboard(){
                     );
                   })()}
 
-                </div>
+                  </div>{/* fim grid inferior */}
+                </div>{/* fim flex column */}
               );
             })()}
 
