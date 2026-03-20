@@ -1,34 +1,7 @@
-import https from "https";
-
-function httpsPost(hostname, path, headers, body) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(body);
-    const options = {
-      hostname,
-      path,
-      method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type":   "application/json",
-        "Content-Length": Buffer.byteLength(data),
-      },
-    };
-    const req = https.request(options, (resp) => {
-      let raw = "";
-      resp.on("data", chunk => { raw += chunk; });
-      resp.on("end", () => resolve({ status: resp.statusCode, body: raw }));
-    });
-    req.on("error", reject);
-    req.write(data);
-    req.end();
-  });
-}
-
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   try {
-    // 1. Token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -42,42 +15,56 @@ export default async function handler(req, res) {
     const { access_token } = await tokenRes.json();
     if (!access_token) return res.status(500).json({ error: "no token" });
 
+    const devToken = process.env.GADS_DEVELOPER_TOKEN;
     const query = "SELECT campaign.id, campaign.name FROM campaign LIMIT 1";
 
-    // Teste via https nativo (evita qualquer quirk do fetch/undici)
-    const r1 = await httpsPost(
-      "googleads.googleapis.com",
-      "/v19/customers/1310129916/googleAds:searchStream",
-      {
-        "authorization":     `Bearer ${access_token}`,
-        "developer-token":   process.env.GADS_DEVELOPER_TOKEN,
-        "login-customer-id": "6994391072",
-      },
-      { query }
-    );
-
-    // Teste fetch com X-Goog-Api-Client
-    const r2 = await fetch(
-      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream",
-      {
+    async function call(url, extraHeaders = {}) {
+      const r = await fetch(url, {
         method: "POST",
         headers: {
-          "Authorization":       `Bearer ${access_token}`,
-          "developer-token":     process.env.GADS_DEVELOPER_TOKEN,
-          "login-customer-id":   "6994391072",
-          "Content-Type":        "application/json",
-          "X-Goog-Api-Client":   "gl-node/18.0.0",
+          "Authorization": `Bearer ${access_token}`,
+          "developer-token": devToken,
+          "Content-Type": "application/json",
+          ...extraHeaders,
         },
         body: JSON.stringify({ query }),
-      }
-    );
-    const t2 = await r2.text();
+      });
+      return { status: r.status, body: (await r.text()).slice(0, 300) };
+    }
 
-    return res.status(200).json({
-      https_nativo: { status: r1.status, body: r1.body.slice(0, 400) },
-      fetch_com_xgoog: { status: r2.status, body: t2.slice(0, 400) },
-    });
+    const results = {};
+
+    // 1. Rocket via MCC (atual)
+    results.rocket_via_mcc = await call(
+      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream",
+      { "login-customer-id": "6994391072" }
+    );
+
+    // 2. MCC diretamente
+    results.mcc_direto = await call(
+      "https://googleads.googleapis.com/v19/customers/6994391072/googleAds:searchStream",
+      { "login-customer-id": "6994391072" }
+    );
+
+    // 3. Rocket sem login-customer-id
+    results.rocket_sem_mcc = await call(
+      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream"
+    );
+
+    // 4. Rocket - search (não stream) via MCC
+    results.rocket_search = await call(
+      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:search",
+      { "login-customer-id": "6994391072" }
+    );
+
+    // 5. MCC - search (não stream)
+    results.mcc_search = await call(
+      "https://googleads.googleapis.com/v19/customers/6994391072/googleAds:search",
+      { "login-customer-id": "6994391072" }
+    );
+
+    return res.status(200).json(results);
   } catch (err) {
-    return res.status(500).json({ error: err.message, stack: err.stack?.slice(0, 300) });
+    return res.status(500).json({ error: err.message });
   }
 }
