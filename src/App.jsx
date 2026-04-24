@@ -1327,7 +1327,7 @@ function DiarioPanel({ cfg, preco }) {
         </div>
         <div style={{background:C.card,border:`2px solid ${C.green}55`,borderRadius:6,padding:"14px 16px",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${C.green}00,${C.green},${C.green}00)`}}/>
-          <KPI label="Vendas Captura" value={fmt.num(totalSales)} color={C.green} sub={fmt.brl(totalRev)}/>
+          <KPI label="Vendas Total" value={fmt.num(totalSales)} color={C.green} sub={fmt.brl(totalRev)}/>
         </div>
         <div style={{background:C.card,border:`1px solid ${C.gold}44`,borderRadius:6,padding:"14px 16px"}}>
           <KPI label="ROAS 15D FIXO" value={fmt.x(roas15D)} color={roas15D!=null&&roas15D>=1?C.green:C.red} sub="últimos 15 dias"/>
@@ -1349,7 +1349,7 @@ function DiarioPanel({ cfg, preco }) {
                   {h:"Leads",         tip:"Leads captados no período selecionado"},
                   {h:"CPL",           tip:"Custo por Lead = Gasto ÷ Leads"},
                   {h:"Vendas 1D",     tip:"Leads que compraram no mesmo dia em que se cadastraram, dentro do período"},
-                  {h:"Vendas Captura",tip:"Vendas de leads cuja data de captura está no período"},
+                  {h:"Vendas Total",tip:"Total de vendas do período"},
                   {h:"Fat. Captura",  tip:"Faturamento das vendas com captura no período"},
                   {h:"Lucro Captura", tip:"Fat. Captura menos o Gasto do período"},
                 ].map(({h,tip},i)=>(
