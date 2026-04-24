@@ -1095,25 +1095,25 @@ function crunchGads(gadsRows, salesRows, allSalesRows, allGadsRows, preco, from,
 
   // 30 days ago threshold
 
-  // salesMap: vendas cuja capture_date está no período (Captura)
+  // salesMap: Vendas Acumuladas (sale_date no período) e Vendas Geradas (sale_date E capture_date no período)
   const salesMap = {};
   for (const s of (allSalesRows||salesRows)) {
     const c = s.campaign || "";
     if (!c.toLowerCase().includes("gads")) continue;
     if (!s.sale_date || s.sale_date < from || s.sale_date > to) continue;
-    if (!salesMap[c]) salesMap[c] = { salesTotal:0, revTotal:0, sales15D:0, rev15D:0, sales1D:0 };
+    if (!salesMap[c]) salesMap[c] = { salesTotal:0, revTotal:0, sales15D:0, rev15D:0, salesGeradas:0 };
     salesMap[c].salesTotal++;
     salesMap[c].revTotal += s.value || preco;
-    // 1D: capturado e comprou no mesmo dia, dentro do período
-    if (s.sale_date && s.capture_date === s.sale_date) {
-      salesMap[c].sales1D++;
+    // Geradas: lead foi captado E comprou dentro do período selecionado
+    if (s.capture_date && s.capture_date >= from && s.capture_date <= to) {
+      salesMap[c].salesGeradas++;
     }
   }
   // rev15D FIXO: usar allSalesRows completo, nunca filtrado
   for (const s of (allSalesRows || salesRows)) {
     const c = s.campaign || "";
     if (!c.toLowerCase().includes("gads")) continue;
-    if (!salesMap[c]) salesMap[c] = { salesTotal:0, revTotal:0, sales15D:0, rev15D:0, sales1D:0 };
+    if (!salesMap[c]) salesMap[c] = { salesTotal:0, revTotal:0, sales15D:0, rev15D:0, salesGeradas:0 };
     if (s.capture_date && s.capture_date >= CUTOFF15) {
       salesMap[c].sales15D++;
       salesMap[c].rev15D += s.value || preco;
@@ -1126,7 +1126,7 @@ function crunchGads(gadsRows, salesRows, allSalesRows, allGadsRows, preco, from,
   const totalSales  = Object.values(salesMap).reduce((s,r)=>s+r.salesTotal,0);
   const totalRev    = totalSales * preco;
   const totalCpl    = totalLeads > 0 ? totalSpend / totalLeads : null;
-  const todaySales  = Object.values(salesMap).reduce((s,r)=>s+(r.sales1D||0),0);
+  const totalGeradas = Object.values(salesMap).reduce((s,r)=>s+(r.salesGeradas||0),0);
 
   // allDatesMap — gasto por campanha/dia usando dados completos (allGadsRows)
   const allDatesMap = {};
@@ -1323,11 +1323,11 @@ function DiarioPanel({ cfg, preco }) {
           <KPI label="Leads" value={fmt.num(totalLeads)} color={C.teal} sub={`CPL ${fmt.brl(totalCpl)}`}/>
         </div>
         <div style={{background:C.card,border:`1px solid ${C.blue}44`,borderRadius:6,padding:"14px 16px"}}>
-          <KPI label="Vendas 1D" value={fmt.num(todaySales)} color={C.blue} sub={fmt.brl(todaySales * preco)}/>
+          <KPI label="Vendas Geradas" value={fmt.num(totalGeradas)} color={C.blue} sub={fmt.brl(totalGeradas * preco)}/>
         </div>
         <div style={{background:C.card,border:`2px solid ${C.green}55`,borderRadius:6,padding:"14px 16px",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${C.green}00,${C.green},${C.green}00)`}}/>
-          <KPI label="Vendas Total" value={fmt.num(totalSales)} color={C.green} sub={fmt.brl(totalRev)}/>
+          <KPI label="Vendas Acumuladas" value={fmt.num(totalSales)} color={C.green} sub={fmt.brl(totalRev)}/>
         </div>
         <div style={{background:C.card,border:`1px solid ${C.gold}44`,borderRadius:6,padding:"14px 16px"}}>
           <KPI label="ROAS 15D FIXO" value={fmt.x(roas15D)} color={roas15D!=null&&roas15D>=1?C.green:C.red} sub="últimos 15 dias"/>
@@ -1348,19 +1348,18 @@ function DiarioPanel({ cfg, preco }) {
                   {h:"Gasto",         tip:"Gasto no período selecionado"},
                   {h:"Leads",         tip:"Leads captados no período selecionado"},
                   {h:"CPL",           tip:"Custo por Lead = Gasto ÷ Leads"},
-                  {h:"Vendas 1D",     tip:"Leads que compraram no mesmo dia em que se cadastraram, dentro do período"},
-                  {h:"Vendas Total",tip:"Total de vendas do período"},
-                  {h:"Lucro 1D",      tip:"Faturamento das vendas compradas no mesmo dia (Vendas 1D × preço)"},
-                  {h:"Lucro Total",   tip:"Faturamento total menos o Gasto do período"},
+                  {h:"Vendas Geradas",   tip:"Vendas cujo lead foi captado E comprou dentro do período selecionado"},
+                  {h:"Vendas Acumuladas",tip:"Todas as vendas com data de compra no período, independente de quando o lead foi captado"},
+                  {h:"Lucro Total",      tip:"Faturamento Acumulado menos o Gasto do período"},
                 ].map(({h,tip},i)=>(
                   <th key={h} style={{padding:"9px 14px",textAlign:i===0?"left":"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>
                     <span style={{display:"inline-flex",alignItems:"center",gap:2}}>{h}<Tip text={tip}/></span>
                   </th>
                 ))}
-                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"aa",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>ROAS CAPTURA<Tip text="Fat. Captura ÷ Gasto do período"/></th>
+                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"aa",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>ROAS PERÍODO<Tip text="Faturamento Acumulado ÷ Gasto do período"/></th>
                 <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.teal+"aa",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>ROAS 7D FIXO<Tip text="Faturamento de leads captados nos últimos 7 dias ÷ Gasto dos últimos 7 dias. Fixo, não muda com o filtro."/></th>
                 <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.blue+"aa",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>ROAS 15D FIXO<Tip text="Faturamento de leads captados nos últimos 15 dias ÷ Gasto dos últimos 15 dias. Fixo, não muda com o filtro."/></th>
-                <th style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:"#c2410c",fontFamily:"'JetBrains Mono',monospace",borderLeft:`2px solid #fed7aa`,whiteSpace:"nowrap"}}>DECISÃO<Tip text="🚀 Escalar: ROAS captura e fixo ≥1 e ≥2. ✅ Bom: ambos ≥1. ⏸ Manter: captura ok, fixo ruim. ⚠️ Atenção: vivendo do passado. ⛔ Pausar: ambos ruins."/></th>
+                <th style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:"#c2410c",fontFamily:"'JetBrains Mono',monospace",borderLeft:`2px solid #fed7aa`,whiteSpace:"nowrap"}}>DECISÃO<Tip text="🚀 Escalar: ROAS período e fixo ≥1 e ≥2. ✅ Bom: ambos ≥1. ⏸ Manter: período ok, fixo ruim. ⚠️ Atenção: vivendo do passado. ⛔ Pausar: ambos ruins."/></th>
               </tr>
             </thead>
             <tbody>
@@ -1370,8 +1369,7 @@ function DiarioPanel({ cfg, preco }) {
                 </td></tr>
               )}
               {campaigns.map((camp, i) => {
-                const sm      = salesMap[camp.campaign] || { salesTotal:0, revTotal:0, sales15D:0, rev15D:0, salesByDate:{} };
-                const pitch   = sm.sales1D || 0;
+                const sm      = salesMap[camp.campaign] || { salesTotal:0, revTotal:0, sales15D:0, rev15D:0, salesGeradas:0 };
                 const cpl     = camp.leadsPeriod > 0 ? camp.spendPeriod / camp.leadsPeriod : null;
                 // ROAS 15D FIXO — mesma lógica do KPI, filtrado só por CUTOFF15
                 const campRev15D   = salesRows
@@ -1385,11 +1383,7 @@ function DiarioPanel({ cfg, preco }) {
                 const campRev7D    = salesRows.filter(s => (s.campaign||"").toLowerCase() === camp.campaign.toLowerCase() && s.capture_date && s.capture_date >= CUTOFF7).reduce((a,s)=>a+(s.value||preco),0);
                 const campSpend7D  = gadsRows.filter(r => r.campaign === camp.campaign && r.date >= CUTOFF7).reduce((a,r)=>a+r.spend,0);
                 const roas7D       = campSpend7D > 0 ? campRev7D / campSpend7D : null;
-                // ROAS PERÍODO — faturamento de leads captados no período / gasto do período
-                const campRevPeriod = filteredSales
-                  .filter(s => (s.campaign||"").toLowerCase() === camp.campaign.toLowerCase() && s.capture_date && s.capture_date >= from && s.capture_date <= to)
-                  .reduce((a,s)=>a+(s.value||preco),0);
-                const roasCaptura = camp.spendPeriod > 0 ? campRevPeriod / camp.spendPeriod : null;
+                // ROAS PERÍODO — faturamento acumulado / gasto do período
                 const roasAcum = camp.spendPeriod > 0 ? (sm.salesTotal||0)*preco / camp.spendPeriod : null;
                 return (
                   <tr key={camp.campaign} style={{borderBottom:`1px solid ${C.border}`,background:i%2?"#f8fafc":"transparent"}}>
@@ -1397,14 +1391,13 @@ function DiarioPanel({ cfg, preco }) {
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.red}}>{fmt.brl(camp.spendPeriod)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.teal}}>{fmt.num(camp.leadsPeriod)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.brl(cpl)}</td>
-                    <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{fmt.num(pitch)}</td>
+                    <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{fmt.num(sm.salesGeradas||0)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600}}>{fmt.num(sm.salesTotal||0)}</td>
-                    <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green,fontWeight:600}}>{fmt.brl((sm.sales1D||0)*preco)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,color:(sm.salesTotal||0)*preco - camp.spendPeriod >= 0 ? C.green : C.red}}>{fmt.brl((sm.salesTotal||0)*preco - camp.spendPeriod)}</td>
-                    <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roasCaptura}/></td>
+                    <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roasAcum}/></td>
                     <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roas7D}/></td>
                     <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roas15D}/></td>
-                    <td style={{padding:"11px 14px",textAlign:"center",borderLeft:`2px solid #fed7aa`}}>{showDecisao7 ? <DecisaoBadge roas15D={roas7D} roasPeriod={roasCaptura}/> : showDecisao ? <DecisaoBadge roas15D={roas15D} roasPeriod={roasCaptura}/> : <span style={{fontSize:9,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",letterSpacing:0.5}}>7D ou 15D</span>}</td>
+                    <td style={{padding:"11px 14px",textAlign:"center",borderLeft:`2px solid #fed7aa`}}>{showDecisao7 ? <DecisaoBadge roas15D={roas7D} roasPeriod={roasAcum}/> : showDecisao ? <DecisaoBadge roas15D={roas15D} roasPeriod={roasAcum}/> : <span style={{fontSize:9,color:"#94a3b8",fontFamily:"'JetBrains Mono',monospace",letterSpacing:0.5}}>7D ou 15D</span>}</td>
                   </tr>
                 );
               })}
@@ -1756,3 +1749,4 @@ export default function Dashboard(){
     </div>
   );
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
