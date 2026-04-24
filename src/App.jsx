@@ -1137,7 +1137,7 @@ function crunchGads(gadsRows, salesRows, allSalesRows, allGadsRows, preco, from,
     allDatesMap[c][r.date] += r.spend;
   }
 
-  return { campMap, salesMap, allDatesMap, totalSpend, totalLeads, totalSales, totalRev, totalCpl, todaySales };
+  return { campMap, salesMap, allDatesMap, totalSpend, totalLeads, totalSales, totalRev, totalCpl, totalGeradas };
 }
 
 
@@ -1234,7 +1234,7 @@ function DiarioPanel({ cfg, preco }) {
   // Filter salesRows by period
   const filteredSales = salesRows.filter(r => r.sale_date && r.sale_date >= from && r.sale_date <= to);
 
-  const { totalSpend, totalLeads, totalSales, totalRev, totalCpl, todaySales, campMap, salesMap, allDatesMap } = crunchGads(filteredGads, filteredSales, salesRows, gadsRows, preco, from, to);
+  const { totalSpend, totalLeads, totalSales, totalRev, totalCpl, totalGeradas, campMap, salesMap, allDatesMap } = crunchGads(filteredGads, filteredSales, salesRows, gadsRows, preco, from, to);
 
   const setPreset = (f, t) => { setFrom(f); setTo(t); setFromTmp(f); setToTmp(t); };
 
@@ -1747,5 +1747,4 @@ export default function Dashboard(){
         </div>
       )}
     </div>
-  );
-}
+  )
