@@ -89,7 +89,7 @@ export default async function handler(req, res) {
           rows.push({
             campaign: r.campaign?.name || "",
             date:     r.segments?.date || "",
-            spend:    (r.metrics?.cost_micros || 0) / 1_000_000,
+            spend:    (Number(r.metrics?.costMicros) || 0) / 1_000_000,
             leads:    Math.round(r.metrics?.conversions || 0),
           });
         }
