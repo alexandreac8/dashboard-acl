@@ -1263,7 +1263,7 @@ function DiarioPanel({ cfg, preco }) {
     allCampMap[c].spendPeriod = filtered ? filtered.spend : 0;
     allCampMap[c].leadsPeriod = filtered ? filtered.leads : 0;
   }
-  const campaigns = Object.values(allCampMap).sort((a,b) => b.spend - a.spend);
+  const campaigns = Object.values(allCampMap).filter(c => c.spendPeriod > 0).sort((a,b) => b.spendPeriod - a.spendPeriod);
   const showDecisao  = from === daysAgo(15) && to === today();
   const showDecisao7 = from === daysAgo(7)  && to === today();
 
