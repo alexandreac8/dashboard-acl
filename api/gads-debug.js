@@ -1,6 +1,5 @@
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-
   try {
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -18,73 +17,60 @@ export default async function handler(req, res) {
     const mccId    = "6994391072";
     const custId   = process.env.GADS_CUSTOMER_ID || "1310129916";
     const devToken = process.env.GADS_DEVELOPER_TOKEN;
-
-    const headers = {
+    const headers  = {
       "Authorization":     `Bearer ${access_token}`,
       "developer-token":   devToken,
       "login-customer-id": mccId,
       "Content-Type":      "application/json",
     };
 
-    // Query 1: listar todas as conversion actions disponíveis
-    const convQuery = `
-      SELECT conversion_action.name, conversion_action.id, conversion_action.status
-      FROM conversion_action
-      WHERE conversion_action.status = 'ENABLED'
-    `;
-    const r1 = await fetch(
-      `https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`,
-      { method: "POST", headers, body: JSON.stringify({ query: convQuery }) }
-    );
-    const raw1 = await r1.text();
-    let convActions = [];
-    try {
-      const parsed = JSON.parse(raw1);
-      if (Array.isArray(parsed)) {
-        for (const batch of parsed) {
-          for (const r of (batch.results || [])) {
-            convActions.push({
-              name: r.conversionAction?.name,
-              id:   r.conversionAction?.id,
-            });
-          }
-        }
-      }
-    } catch(e) { convActions = [{ error: raw1.slice(0, 300) }]; }
-
-    // Query 2: conversões por action name nos últimos 7 dias
-    const segQuery = `
-      SELECT campaign.name, segments.date, segments.conversion_action_name, metrics.conversions
+    // all_conversions segmentado por action — campanhas gads, abril
+    const query = `
+      SELECT campaign.name, segments.date, segments.conversion_action_name,
+             metrics.all_conversions, metrics.conversions
       FROM campaign
-      WHERE segments.date BETWEEN '2026-04-17' AND '2026-04-24'
-        AND metrics.conversions > 0
+      WHERE segments.date BETWEEN '2026-04-01' AND '2026-04-24'
+        AND campaign.name LIKE '%gads%'
       ORDER BY segments.date DESC
-      LIMIT 20
     `;
-    const r2 = await fetch(
+    const r = await fetch(
       `https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`,
-      { method: "POST", headers, body: JSON.stringify({ query: segQuery }) }
+      { method: "POST", headers, body: JSON.stringify({ query }) }
     );
-    const raw2 = await r2.text();
-    let convRows = [];
+    const raw = await r.text();
+    let rows = [];
     try {
-      const parsed = JSON.parse(raw2);
+      const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         for (const batch of parsed) {
-          for (const r of (batch.results || [])) {
-            convRows.push({
-              campaign:   r.campaign?.name,
-              date:       r.segments?.date,
-              actionName: r.segments?.conversionActionName,
-              conversions: r.metrics?.conversions,
-            });
+          for (const row of (batch.results || [])) {
+            const allConv = parseFloat(row.metrics?.allConversions || 0);
+            const conv    = parseFloat(row.metrics?.conversions || 0);
+            if (allConv > 0 || conv > 0) {
+              rows.push({
+                campaign:   row.campaign?.name,
+                date:       row.segments?.date,
+                actionName: row.segments?.conversionActionName,
+                allConv,
+                conv,
+              });
+            }
           }
         }
       }
-    } catch(e) { convRows = [{ error: raw2.slice(0, 300) }]; }
+    } catch(e) { return res.status(200).json({ error: e.message, raw: raw.slice(0,500) }); }
 
-    return res.status(200).json({ convActions, convRows });
+    // Agrupar por actionName
+    const byAction = {};
+    for (const r of rows) {
+      const k = r.actionName || 'unknown';
+      if (!byAction[k]) byAction[k] = { allConv: 0, conv: 0, count: 0 };
+      byAction[k].allConv += r.allConv;
+      byAction[k].conv    += r.conv;
+      byAction[k].count++;
+    }
 
+    return res.status(200).json({ byAction, rows: rows.slice(0, 30) });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
