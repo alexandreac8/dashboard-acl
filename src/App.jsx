@@ -1330,7 +1330,7 @@ function DiarioPanel({ cfg, preco }) {
           <KPI label="Vendas Acumuladas" value={fmt.num(totalSales)} color={C.green} sub={fmt.brl(totalRev)}/>
         </div>
         <div style={{background:C.card,border:`1px solid ${C.gold}44`,borderRadius:6,padding:"14px 16px"}}>
-          <KPI label="ROAS ACUMULADO" value={fmt.x(roas15D)} color={roas15D!=null&&roas15D>=1?C.green:C.red} sub="últimos 15 dias"/>
+          <KPI label="ROAS ACUMULADO" value={fmt.x(totalSpend>0?totalRev/totalSpend:null)} color={(totalSpend>0&&totalRev/totalSpend>=1)?C.green:C.red} sub="período selecionado"/>
         </div>
       </div>
 
@@ -1356,8 +1356,8 @@ function DiarioPanel({ cfg, preco }) {
                     <span style={{display:"inline-flex",alignItems:"center",gap:2}}>{h}<Tip text={tip}/></span>
                   </th>
                 ))}
-                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"aa",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>ROAS ACUMULADO<Tip text="Vendas Acumuladas × preço ÷ Gasto do período"/></th>
                 <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.green+"aa",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>ROAS GERADO<Tip text="Vendas Geradas × preço ÷ Gasto do período"/></th>
+                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"aa",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>ROAS ACUMULADO<Tip text="Vendas Acumuladas × preço ÷ Gasto do período"/></th>
                 <th style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:"#c2410c",fontFamily:"'JetBrains Mono',monospace",borderLeft:`2px solid #fed7aa`,whiteSpace:"nowrap"}}>DECISÃO<Tip text="🚀 Escalar: ROAS Acumulado e Gerado ≥2. ✅ Bom: ambos ≥1. ⏸ Manter: Acumulado ok, Gerado ruim. ⚠️ Atenção: vivendo do passado. ⛔ Pausar: ambos ruins."/></th>
               </tr>
             </thead>
@@ -1383,8 +1383,8 @@ function DiarioPanel({ cfg, preco }) {
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{fmt.num(sm.salesGeradas||0)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600}}>{fmt.num(sm.salesTotal||0)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,color:(sm.salesTotal||0)*preco - camp.spendPeriod >= 0 ? C.green : C.red}}>{fmt.brl((sm.salesTotal||0)*preco - camp.spendPeriod)}</td>
-                    <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roasAcum}/></td>
                     <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roasGerado}/></td>
+                    <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roasAcum}/></td>
                     <td style={{padding:"11px 14px",textAlign:"center",borderLeft:`2px solid #fed7aa`}}><DecisaoBadge roas15D={roasGerado} roasPeriod={roasAcum}/></td>
                   </tr>
                 );
@@ -1731,9 +1731,4 @@ export default function Dashboard(){
                 else{setPassErr(true);setPassInput("");}
               }} style={{padding:"7px 14px",background:"#3b82f6",border:"none",color:"#fff",borderRadius:5,cursor:"pointer",fontSize:12,fontWeight:600}}>Entrar</button>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+          </
