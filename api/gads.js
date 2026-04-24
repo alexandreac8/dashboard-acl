@@ -24,53 +24,84 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Token error", detail: tokenData });
     }
 
-    // 2. Chamar Google Ads API
-    const customerId = process.env.GADS_CUSTOMER_ID;
+    // 2. Montar query
+    const fromDate = from || "2025-01-01";
+    const toDate   = to   || new Date().toISOString().slice(0, 10);
     const query = `
-      SELECT
-        campaign.name,
-        segments.date,
-        metrics.cost_micros,
-        metrics.conversions
+      SELECT campaign.name, segments.date, metrics.cost_micros, metrics.conversions
       FROM campaign
-      WHERE segments.date BETWEEN '${from || "2025-01-01"}' AND '${to || new Date().toISOString().slice(0,10)}'
+      WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'
       ORDER BY segments.date DESC
     `;
 
-    const gadsRes = await fetch(
-      `https://googleads.googleapis.com/v24/customers/${customerId}/googleAds:searchStream`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization":     `Bearer ${tokenData.access_token}`,
-          "developer-token":   process.env.GADS_DEVELOPER_TOKEN,
-          "login-customer-id": "6994391072",
-          "Content-Type":      "application/json",
-        },
-        body: JSON.stringify({ query }),
-      }
-    );
+    // 3. Descobrir customer ID correto: tenta env var, fallback para sub-conta conhecida
+    const mccId      = "6994391072";
+    const subId      = "1310129916";
+    const envId      = process.env.GADS_CUSTOMER_ID || "";
+    const devToken   = process.env.GADS_DEVELOPER_TOKEN;
 
-    const gadsData = await gadsRes.json();
-    if (!Array.isArray(gadsData)) {
-      return res.status(500).json({ error: "Gads API error", detail: gadsData });
+    // Tenta na ordem: env var → sub-conta → MCC direto
+    const candidates = [...new Set([envId, subId, mccId].filter(Boolean))];
+
+    let rows = null;
+    let lastError = null;
+
+    for (const custId of candidates) {
+      const gadsRes = await fetch(
+        `https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization":     `Bearer ${tokenData.access_token}`,
+            "developer-token":   devToken,
+            "login-customer-id": mccId,
+            "Content-Type":      "application/json",
+          },
+          body: JSON.stringify({ query }),
+        }
+      );
+
+      const rawText = await gadsRes.text();
+
+      // Se retornou HTML é 404/erro de rota
+      if (rawText.trim().startsWith("<")) {
+        lastError = { custId, status: gadsRes.status, reason: "HTML response (rota inválida)" };
+        continue;
+      }
+
+      let parsed;
+      try { parsed = JSON.parse(rawText); } catch (e) {
+        lastError = { custId, status: gadsRes.status, reason: "JSON inválido", raw: rawText.slice(0, 300) };
+        continue;
+      }
+
+      // Erro da API do Google (ex: permissão negada, conta errada)
+      if (!Array.isArray(parsed)) {
+        lastError = { custId, status: gadsRes.status, reason: "API error", detail: parsed };
+        continue;
+      }
+
+      // Sucesso!
+      rows = [];
+      for (const batch of parsed) {
+        for (const r of (batch.results || [])) {
+          rows.push({
+            campaign: r.campaign?.name || "",
+            date:     r.segments?.date || "",
+            spend:    (r.metrics?.cost_micros || 0) / 1_000_000,
+            leads:    Math.round(r.metrics?.conversions || 0),
+          });
+        }
+      }
+      break;
     }
 
-    // 3. Processar e retornar
-    const rows = [];
-    for (const batch of gadsData) {
-      for (const r of (batch.results || [])) {
-        const campaign = r.campaign?.name || "";
-        rows.push({
-          campaign,
-          date:  r.segments?.date || "",
-          spend: (r.metrics?.cost_micros || 0) / 1_000_000,
-          leads: Math.round(r.metrics?.conversions || 0),
-        });
-      }
+    if (rows !== null) {
+      return res.status(200).json({ rows });
     }
 
-    return res.status(200).json({ rows });
+    return res.status(500).json({ error: "Todas as contas falharam", lastError, candidates });
+
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
