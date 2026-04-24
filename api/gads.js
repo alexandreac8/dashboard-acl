@@ -125,7 +125,9 @@ export default async function handler(req, res) {
       };
     });
 
-    return res.status(200).json({ rows });
+    // debug
+    const leadsRawSample = leadsParsed ? (leadsParsed[0]?.results || []).slice(0,3) : [];
+    return res.status(200).json({ rows, leadsDebug: { batches: leadsParsed?.length || 0, sampleRows: leadsRawSample } });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
