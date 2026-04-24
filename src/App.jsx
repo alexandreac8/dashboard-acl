@@ -1348,9 +1348,9 @@ function DiarioPanel({ cfg, preco }) {
                   {h:"Gasto",         tip:"Gasto no período selecionado"},
                   {h:"Leads",         tip:"Leads captados no período selecionado"},
                   {h:"CPL",           tip:"Custo por Lead = Gasto ÷ Leads"},
-                  {h:"Vendas Geradas",   tip:"Vendas cujo lead foi captado E comprou dentro do período selecionado"},
-                  {h:"Vendas Acumuladas",tip:"Todas as vendas com data de compra no período, independente de quando o lead foi captado"},
-                  {h:"Lucro Total",      tip:"Faturamento Acumulado menos o Gasto do período"},
+                  {h:"Vendas Geradas",    tip:"Vendas cujo lead foi captado E comprou dentro do período selecionado"},
+                  {h:"Vendas Acumuladas",  tip:"Todas as vendas com data de compra no período, independente de quando o lead foi captado"},
+                  {h:"Lucro Total",        tip:"Faturamento Acumulado menos o Gasto do período"},
                 ].map(({h,tip},i)=>(
                   <th key={h} style={{padding:"9px 14px",textAlign:i===0?"left":"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>
                     <span style={{display:"inline-flex",alignItems:"center",gap:2}}>{h}<Tip text={tip}/></span>
@@ -1747,4 +1747,5 @@ export default function Dashboard(){
         </div>
       )}
     </div>
-  )
+  );
+}
