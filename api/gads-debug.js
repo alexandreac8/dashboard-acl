@@ -5,38 +5,24 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id:     process.env.GADS_CLIENT_ID,
-        client_secret: process.env.GADS_CLIENT_SECRET,
-        refresh_token: process.env.GADS_REFRESH_TOKEN,
-        grant_type:    "refresh_token",
+        client_id: process.env.GADS_CLIENT_ID, client_secret: process.env.GADS_CLIENT_SECRET,
+        refresh_token: process.env.GADS_REFRESH_TOKEN, grant_type: "refresh_token",
       }),
     });
     const { access_token } = await tokenRes.json();
-    if (!access_token) return res.status(500).json({ error: "no token" });
+    const mccId = "6994391072", custId = process.env.GADS_CUSTOMER_ID || "1310129916";
+    const headers = { "Authorization": `Bearer ${access_token}`, "developer-token": process.env.GADS_DEVELOPER_TOKEN, "login-customer-id": mccId, "Content-Type": "application/json" };
 
-    const mccId    = "6994391072";
-    const custId   = process.env.GADS_CUSTOMER_ID || "1310129916";
-    const devToken = process.env.GADS_DEVELOPER_TOKEN;
-    const headers  = {
-      "Authorization":     `Bearer ${access_token}`,
-      "developer-token":   devToken,
-      "login-customer-id": mccId,
-      "Content-Type":      "application/json",
-    };
-
-    // all_conversions segmentado por action — campanhas gads, abril
+    // Todas as conversion actions com all_conversions > 0 para campanhas gads em abril
     const query = `
-      SELECT campaign.name, segments.date, segments.conversion_action_name,
-             metrics.all_conversions, metrics.conversions
+      SELECT campaign.name, segments.conversion_action_name, metrics.all_conversions, metrics.conversions
       FROM campaign
       WHERE segments.date BETWEEN '2026-04-01' AND '2026-04-24'
-        AND campaign.name LIKE '%gads%'
-      ORDER BY segments.date DESC
+        AND campaign.name REGEXP_MATCH '.*gads.*'
+        AND metrics.all_conversions > 0
     `;
-    const r = await fetch(
-      `https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`,
-      { method: "POST", headers, body: JSON.stringify({ query }) }
-    );
+    const r = await fetch(`https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`,
+      { method: "POST", headers, body: JSON.stringify({ query }) });
     const raw = await r.text();
     let rows = [];
     try {
@@ -44,34 +30,25 @@ export default async function handler(req, res) {
       if (Array.isArray(parsed)) {
         for (const batch of parsed) {
           for (const row of (batch.results || [])) {
-            const allConv = parseFloat(row.metrics?.allConversions || 0);
-            const conv    = parseFloat(row.metrics?.conversions || 0);
-            if (allConv > 0 || conv > 0) {
-              rows.push({
-                campaign:   row.campaign?.name,
-                date:       row.segments?.date,
-                actionName: row.segments?.conversionActionName,
-                allConv,
-                conv,
-              });
-            }
+            rows.push({
+              campaign: row.campaign?.name,
+              action: row.segments?.conversionActionName,
+              allConv: row.metrics?.allConversions,
+              conv: row.metrics?.conversions,
+            });
           }
         }
-      }
-    } catch(e) { return res.status(200).json({ error: e.message, raw: raw.slice(0,500) }); }
+      } else { rows = [{ error: JSON.stringify(parsed).slice(0,300) }]; }
+    } catch(e) { rows = [{ error: raw.slice(0,300) }]; }
 
-    // Agrupar por actionName
+    // Agrupar por action name
     const byAction = {};
     for (const r of rows) {
-      const k = r.actionName || 'unknown';
-      if (!byAction[k]) byAction[k] = { allConv: 0, conv: 0, count: 0 };
-      byAction[k].allConv += r.allConv;
-      byAction[k].conv    += r.conv;
-      byAction[k].count++;
+      const k = r.action || 'unknown';
+      if (!byAction[k]) byAction[k] = { allConv: 0, conv: 0 };
+      byAction[k].allConv += parseFloat(r.allConv || 0);
+      byAction[k].conv    += parseFloat(r.conv || 0);
     }
-
-    return res.status(200).json({ byAction, rows: rows.slice(0, 30) });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+    return res.status(200).json({ byAction, rawRows: rows.slice(0,10) });
+  } catch(err) { return res.status(500).json({ error: err.message }); }
 }
