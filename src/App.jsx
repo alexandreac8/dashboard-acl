@@ -1100,7 +1100,7 @@ function crunchGads(gadsRows, salesRows, allSalesRows, allGadsRows, preco, from,
   for (const s of (allSalesRows||salesRows)) {
     const c = s.campaign || "";
     if (!c.toLowerCase().includes("gads")) continue;
-    if (!s.capture_date || s.capture_date < from || s.capture_date > to) continue;
+    if (!s.sale_date || s.sale_date < from || s.sale_date > to) continue;
     if (!salesMap[c]) salesMap[c] = { salesTotal:0, revTotal:0, sales15D:0, rev15D:0, sales1D:0 };
     salesMap[c].salesTotal++;
     salesMap[c].revTotal += s.value || preco;
