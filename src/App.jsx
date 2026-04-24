@@ -1146,7 +1146,7 @@ function DecisaoBadge({ roas15D, roasPeriod: roasCaptura }) {
   const b15hi  = roas15D    != null && roas15D    >= 2;
   const b15ok  = roas15D    != null && roas15D    >= 1;
   const bPerok = roasCaptura != null && roasCaptura >= 1;
-  if      (roas15D == null && roasPeriod == null) { emoji="—";  label="SEM DADOS";  bg="#f1f5f9"; color="#94a3b8"; }
+  if      (roas15D == null && roasCaptura == null) { emoji="—";  label="SEM DADOS";  bg="#f1f5f9"; color="#94a3b8"; }
   else if (b15hi && bPerok)                       { emoji="🚀"; label="ESCALAR";    bg="#dcfce7"; color="#15803d"; }
   else if (b15ok && bPerok)                       { emoji="✅"; label="BOM";         bg="#d1fae5"; color="#065f46"; }
   else if (bPerok && !b15ok)                      { emoji="⏸"; label="MANTER";      bg="#fef9c3"; color="#854d0e"; }
