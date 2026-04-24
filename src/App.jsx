@@ -1731,4 +1731,9 @@ export default function Dashboard(){
                 else{setPassErr(true);setPassInput("");}
               }} style={{padding:"7px 14px",background:"#3b82f6",border:"none",color:"#fff",borderRadius:5,cursor:"pointer",fontSize:12,fontWeight:600}}>Entrar</button>
             </div>
-          </
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
