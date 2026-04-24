@@ -1314,7 +1314,7 @@ function DiarioPanel({ cfg, preco }) {
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:20}}>
         <div style={{background:"#c8d3dc",border:`1px solid #a0adb8`,borderRadius:6,padding:"14px 16px",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${C.green}00,${C.green},${C.green}00)`}}/>
-          <KPI label="Lucro Captura" value={fmt.brl(totalRev - totalSpend)} color={totalRev-totalSpend>=0?C.green:C.red} dark/>
+          <KPI label="Lucro Total" value={fmt.brl(totalRev - totalSpend)} color={totalRev-totalSpend>=0?C.green:C.red} dark/>
         </div>
         <div style={{background:C.card,border:`1px solid ${C.red}44`,borderRadius:6,padding:"14px 16px"}}>
           <KPI label="Gasto Total" value={fmt.brl(totalSpend)} color={C.red}/>
@@ -1350,8 +1350,8 @@ function DiarioPanel({ cfg, preco }) {
                   {h:"CPL",           tip:"Custo por Lead = Gasto ÷ Leads"},
                   {h:"Vendas 1D",     tip:"Leads que compraram no mesmo dia em que se cadastraram, dentro do período"},
                   {h:"Vendas Total",tip:"Total de vendas do período"},
-                  {h:"Fat. Captura",  tip:"Faturamento das vendas com captura no período"},
-                  {h:"Lucro Captura", tip:"Fat. Captura menos o Gasto do período"},
+                  {h:"Lucro 1D",      tip:"Faturamento das vendas compradas no mesmo dia (Vendas 1D × preço)"},
+                  {h:"Lucro Total",   tip:"Faturamento total menos o Gasto do período"},
                 ].map(({h,tip},i)=>(
                   <th key={h} style={{padding:"9px 14px",textAlign:i===0?"left":"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>
                     <span style={{display:"inline-flex",alignItems:"center",gap:2}}>{h}<Tip text={tip}/></span>
@@ -1399,7 +1399,7 @@ function DiarioPanel({ cfg, preco }) {
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.brl(cpl)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{fmt.num(pitch)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600}}>{fmt.num(sm.salesTotal||0)}</td>
-                    <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green,fontWeight:600}}>{fmt.brl((sm.salesTotal||0)*preco)}</td>
+                    <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green,fontWeight:600}}>{fmt.brl((sm.sales1D||0)*preco)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,color:(sm.salesTotal||0)*preco - camp.spendPeriod >= 0 ? C.green : C.red}}>{fmt.brl((sm.salesTotal||0)*preco - camp.spendPeriod)}</td>
                     <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roasCaptura}/></td>
                     <td style={{padding:"11px 14px",textAlign:"right"}}><RoasBadge v={roas7D}/></td>
