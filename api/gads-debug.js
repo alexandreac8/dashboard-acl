@@ -15,55 +15,49 @@ export default async function handler(req, res) {
     const { access_token } = await tokenRes.json();
     if (!access_token) return res.status(500).json({ error: "no token" });
 
+    const mccId    = "6994391072";
+    const custId   = process.env.GADS_CUSTOMER_ID || "1310129916";
     const devToken = process.env.GADS_DEVELOPER_TOKEN;
-    const query = "SELECT campaign.id, campaign.name FROM campaign LIMIT 1";
 
-    async function call(url, extraHeaders = {}) {
-      const r = await fetch(url, {
+    const query = `
+      SELECT campaign.name, segments.date, metrics.cost_micros, metrics.conversions,
+             metrics.clicks, metrics.impressions
+      FROM campaign
+      WHERE segments.date BETWEEN '2026-04-20' AND '2026-04-22'
+      ORDER BY segments.date DESC
+      LIMIT 5
+    `;
+
+    const r = await fetch(
+      `https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`,
+      {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${access_token}`,
-          "developer-token": devToken,
-          "Content-Type": "application/json",
-          ...extraHeaders,
+          "Authorization":     `Bearer ${access_token}`,
+          "developer-token":   devToken,
+          "login-customer-id": mccId,
+          "Content-Type":      "application/json",
         },
         body: JSON.stringify({ query }),
-      });
-      return { status: r.status, body: (await r.text()).slice(0, 300) };
-    }
-
-    const results = {};
-
-    // 1. Rocket via MCC (atual)
-    results.rocket_via_mcc = await call(
-      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream",
-      { "login-customer-id": "6994391072" }
+      }
     );
 
-    // 2. MCC diretamente
-    results.mcc_direto = await call(
-      "https://googleads.googleapis.com/v19/customers/6994391072/googleAds:searchStream",
-      { "login-customer-id": "6994391072" }
-    );
+    const raw = await r.text();
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch(e) { return res.status(200).json({ raw: raw.slice(0,500) }); }
 
-    // 3. Rocket sem login-customer-id
-    results.rocket_sem_mcc = await call(
-      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:searchStream"
-    );
+    // Retornar os primeiros resultados brutos para debug
+    const firstBatch = Array.isArray(parsed) ? parsed[0] : parsed;
+    const firstResult = firstBatch?.results?.[0] || null;
 
-    // 4. Rocket - search (não stream) via MCC
-    results.rocket_search = await call(
-      "https://googleads.googleapis.com/v19/customers/1310129916/googleAds:search",
-      { "login-customer-id": "6994391072" }
-    );
+    return res.status(200).json({
+      custId,
+      status: r.status,
+      firstResult,
+      totalBatches: Array.isArray(parsed) ? parsed.length : 0,
+      totalRows: Array.isArray(parsed) ? parsed.reduce((s,b)=>s+(b.results||[]).length,0) : 0,
+    });
 
-    // 5. MCC - search (não stream)
-    results.mcc_search = await call(
-      "https://googleads.googleapis.com/v19/customers/6994391072/googleAds:search",
-      { "login-customer-id": "6994391072" }
-    );
-
-    return res.status(200).json(results);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
