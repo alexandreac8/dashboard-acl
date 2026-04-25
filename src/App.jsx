@@ -1058,6 +1058,52 @@ async function fetchGadsAPI(cfg, from, to) {
   return data.rows || [];
 }
 
+// Busca leads diretamente da Google Ads API via proxy (sem segments.date no SELECT)
+// Usada como fallback quando serverless retorna 0 leads
+async function fetchGadsLeadsFrontend(cfg, from, to) {
+  try {
+    const token = await getGadsAccessToken(cfg);
+    const mccId  = "6994391072";
+    const custId = cfg.gadsCustomerId || "1310129916";
+    const query  = [
+      "SELECT campaign.name, segments.conversion_action_name, metrics.all_conversions",
+      "FROM campaign",
+      `WHERE segments.date BETWEEN '${from}' AND '${to}'`,
+      "  AND campaign.name REGEXP_MATCH '.*gads.*'",
+      "  AND metrics.all_conversions > 0",
+    ].join(" ");
+    const targetUrl = `https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`;
+    const proxyUrl  = "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl);
+    const res = await fetch(proxyUrl, {
+      method: "POST",
+      headers: {
+        "Authorization":     `Bearer ${token}`,
+        "developer-token":   cfg.gadsDeveloperToken,
+        "login-customer-id": mccId,
+        "Content-Type":      "application/json",
+      },
+      body: JSON.stringify({ query }),
+    });
+    const rawText = await res.text();
+    if (!rawText || rawText.trim().startsWith("<")) return {};
+    let parsed;
+    try { parsed = JSON.parse(rawText); } catch(e) { return {}; }
+    if (!Array.isArray(parsed)) return {};
+    const leadsMap = {};
+    for (const batch of parsed) {
+      for (const r of (batch.results || [])) {
+        const actionName = r.segments?.conversionActionName || "";
+        if (!actionName.includes("INF Lead")) continue;
+        const camp = r.campaign?.name || "";
+        leadsMap[camp] = (leadsMap[camp] || 0) + Math.round(Number(r.metrics?.allConversions) || 0);
+      }
+    }
+    return leadsMap;
+  } catch(e) {
+    return {};
+  }
+}
+
 async function fetchGadsReport(gadsUrl) {
   const res = await fetch(gadsUrl);
   if (!res.ok) throw new Error(`Google Ads report: erro ${res.status}`);
@@ -1221,13 +1267,29 @@ function DiarioPanel({ cfg, preco }) {
     try {
       // Usa API direta se tiver credenciais, senão cai no CSV
       const useAPI = cfg.gadsClientId && cfg.gadsRefreshToken && cfg.gadsDeveloperToken;
-      const gadsPromise = useAPI
-        ? fetchGadsAPI(cfg, daysAgo(90), today())
-        : fetchGadsReport(GADS_URL);
-      const [gads, sales] = await Promise.all([
-        gadsPromise,
-        cfg.csvUrl ? fetchSheetsGads(cfg, preco) : [],
-      ]);
+      let gads, sales;
+      if (useAPI) {
+        // Custo via serverless + leads direto do frontend (evita bug de segmentos no serverless)
+        const [gadsFromAPI, salesData, leadsMap] = await Promise.all([
+          fetchGadsAPI(cfg, daysAgo(90), today()),
+          cfg.csvUrl ? fetchSheetsGads(cfg, preco) : Promise.resolve([]),
+          fetchGadsLeadsFrontend(cfg, daysAgo(90), today()),
+        ]);
+        // Injeta leads na primeira row de cada campanha
+        const campLeadsUsed = {};
+        gads = gadsFromAPI.map(r => {
+          if (!campLeadsUsed[r.campaign] && leadsMap[r.campaign]) {
+            campLeadsUsed[r.campaign] = true;
+            return { ...r, leads: leadsMap[r.campaign] };
+          }
+          return r;
+        });
+        sales = salesData;
+      } else {
+        const gadsPromise = fetchGadsReport(GADS_URL);
+        const [g, s] = await Promise.all([gadsPromise, cfg.csvUrl ? fetchSheetsGads(cfg, preco) : []]);
+        gads = g; sales = s;
+      }
       setGadsRows(gads);
       setSalesRows(sales);
       setLoaded(true);
