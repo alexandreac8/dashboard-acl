@@ -1,4 +1,4 @@
-// v25 - leads query sem segments.date no SELECT (evita conflito de segmentos)
+// v26 - leads por dia via campaign_conversion_action (resolve bug segments.date + conversion_action_name)
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -36,15 +36,15 @@ export default async function handler(req, res) {
       ORDER BY segments.date DESC
     `;
 
-    // Query 2: leads por campanha SEM segments.date no SELECT
-    // (combinar segments.date + segments.conversion_action_name no SELECT causa erro)
-    // Filtramos "INF Lead" no JS depois
+    // Query 2: leads por campanha/dia via campaign_conversion_action
+    // Esse recurso permite segments.date + conversion_action.name juntos (sem o bug do resource campaign)
     const leadsQuery = `
-      SELECT campaign.name, segments.conversion_action_name, metrics.all_conversions
-      FROM campaign
+      SELECT campaign.name, segments.date, conversion_action.name, metrics.all_conversions
+      FROM campaign_conversion_action
       WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'
         AND campaign.name REGEXP_MATCH '.*gads.*'
         AND metrics.all_conversions > 0
+      ORDER BY segments.date DESC
     `;
 
     const mccId    = "6994391072";
@@ -76,7 +76,6 @@ export default async function handler(req, res) {
     }
 
     let costParsed = null;
-    let leadsParsed = null;
     let usedCustId = null;
 
     for (const custId of candidates) {
@@ -88,9 +87,9 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Todas as contas falharam no custo", candidates });
     }
 
-    leadsParsed = await runQuery(usedCustId, leadsQuery);
+    const leadsParsed = await runQuery(usedCustId, leadsQuery);
 
-    // Processar custo
+    // Processar custo: mapa campaign|date -> spend
     const spendMap = {};
     for (const batch of costParsed) {
       for (const r of (batch.results || [])) {
@@ -99,52 +98,27 @@ export default async function handler(req, res) {
       }
     }
 
-    // Processar leads: total por campanha (sem data), filtrando por "INF Lead"
-    const leadsMap = {}; // campaign -> total leads
+    // Processar leads: mapa campaign|date -> leads (filtrando só "INF Lead")
+    const leadsPerDay = {};
     if (leadsParsed) {
       for (const batch of leadsParsed) {
         for (const r of (batch.results || [])) {
-          const actionName = r.segments?.conversionActionName || "";
+          const actionName = r.conversionAction?.name || "";
           if (!actionName.includes("INF Lead")) continue;
-          const camp = r.campaign?.name || "";
-          leadsMap[camp] = (leadsMap[camp] || 0) + Math.round(Number(r.metrics?.allConversions) || 0);
+          const key = `${r.campaign?.name}|${r.segments?.date}`;
+          leadsPerDay[key] = (leadsPerDay[key] || 0) + Math.round(Number(r.metrics?.allConversions) || 0);
         }
       }
     }
 
-    // Calcular spend total por campanha para distribuição proporcional de leads
-    const totalSpendByCamp = {};
-    for (const [key, spend] of Object.entries(spendMap)) {
-      const [campaign] = key.split("|");
-      totalSpendByCamp[campaign] = (totalSpendByCamp[campaign] || 0) + spend;
-    }
-
-    // Distribuir leads proporcionalmente por dia (baseado na fração do gasto de cada dia)
-    // Isso garante que qualquer filtro de período mostre leads corretos
-    const allEntries = Object.entries(spendMap).sort(([a], [b]) => b.localeCompare(a));
-    const campLeadsRemaining = { ...leadsMap };
-    const campRowCount = {};
-    for (const [key] of allEntries) {
-      const [campaign] = key.split("|");
-      campRowCount[campaign] = (campRowCount[campaign] || 0) + 1;
-    }
-    let rowIdx = {};
-    const rows = allEntries.map(([key, spend]) => {
-      const [campaign, date] = key.split("|");
-      const campTotalSpend = totalSpendByCamp[campaign] || 1;
-      const totalLeadsCamp = leadsMap[campaign] || 0;
-      rowIdx[campaign] = (rowIdx[campaign] || 0) + 1;
-      const isLast = rowIdx[campaign] === campRowCount[campaign];
-      let leads;
-      if (isLast) {
-        // Última row recebe o restante (evita erro de arredondamento)
-        leads = campLeadsRemaining[campaign] || 0;
-      } else {
-        leads = Math.round(totalLeadsCamp * (spend / campTotalSpend));
-        campLeadsRemaining[campaign] = (campLeadsRemaining[campaign] || 0) - leads;
-      }
-      return { campaign, date, spend, leads };
-    });
+    // Construir rows: gasto + leads por campanha/dia (dados reais, sem distribuição proporcional)
+    const rows = Object.entries(spendMap)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, spend]) => {
+        const [campaign, date] = key.split("|");
+        const leads = leadsPerDay[key] || 0;
+        return { campaign, date, spend, leads };
+      });
 
     return res.status(200).json({ rows });
 
