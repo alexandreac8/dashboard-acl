@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       SELECT campaign.name, segments.date, metrics.all_conversions
       FROM campaign
       WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'
-        AND segments.conversion_action_name REGEXP_MATCH '.*INF Lead.*'
+        AND segments.conversion_action = 'customers/1310129916/conversionActions/1001616380'
       ORDER BY segments.date DESC
     `;
 
