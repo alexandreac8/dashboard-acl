@@ -1269,9 +1269,9 @@ function DiarioPanel({ cfg, preco }) {
       const useAPI = cfg.gadsClientId && cfg.gadsRefreshToken && cfg.gadsDeveloperToken;
       let gads, sales;
       if (useAPI) {
-        // Custo + leads via serverless (api/gads.js já trata leads sem segments.date)
+        // Busca dados do período selecionado (from/to) — leads reais por dia via campaign_conversion_action
         const [gadsFromAPI, salesData] = await Promise.all([
-          fetchGadsAPI(cfg, daysAgo(90), today()),
+          fetchGadsAPI(cfg, from, to),
           cfg.csvUrl ? fetchSheetsGads(cfg, preco) : Promise.resolve([]),
         ]);
         gads = gadsFromAPI;
@@ -1286,9 +1286,9 @@ function DiarioPanel({ cfg, preco }) {
       setLoaded(true);
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
-  }, [cfg, preco]);
+  }, [cfg, preco, from, to]);
 
-    useEffect(() => { load(); }, [cfg.metaToken, cfg.csvUrl]);
+  useEffect(() => { load(); }, [load]);
 
   // Filter gadsRows by period
   const filteredGads = gadsRows.filter(r => r.date >= from && r.date <= to);
