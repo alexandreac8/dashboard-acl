@@ -1269,21 +1269,12 @@ function DiarioPanel({ cfg, preco }) {
       const useAPI = cfg.gadsClientId && cfg.gadsRefreshToken && cfg.gadsDeveloperToken;
       let gads, sales;
       if (useAPI) {
-        // Custo via serverless + leads direto do frontend (evita bug de segmentos no serverless)
-        const [gadsFromAPI, salesData, leadsMap] = await Promise.all([
+        // Custo + leads via serverless (api/gads.js já trata leads sem segments.date)
+        const [gadsFromAPI, salesData] = await Promise.all([
           fetchGadsAPI(cfg, daysAgo(90), today()),
           cfg.csvUrl ? fetchSheetsGads(cfg, preco) : Promise.resolve([]),
-          fetchGadsLeadsFrontend(cfg, daysAgo(90), today()),
         ]);
-        // Injeta leads na primeira row de cada campanha
-        const campLeadsUsed = {};
-        gads = gadsFromAPI.map(r => {
-          if (!campLeadsUsed[r.campaign] && leadsMap[r.campaign]) {
-            campLeadsUsed[r.campaign] = true;
-            return { ...r, leads: leadsMap[r.campaign] };
-          }
-          return r;
-        });
+        gads = gadsFromAPI;
         sales = salesData;
       } else {
         const gadsPromise = fetchGadsReport(GADS_URL);
