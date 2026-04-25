@@ -1,4 +1,4 @@
-// v24 - leads from "INF Lead Curso Grátis" conversion action
+// v24 - leads from INF Lead Curso Grátis (filter by action name in JS)
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -9,7 +9,6 @@ export default async function handler(req, res) {
   const { from, to } = req.body || {};
 
   try {
-    // 1. Obter access token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -28,7 +27,7 @@ export default async function handler(req, res) {
     const fromDate = from || "2025-01-01";
     const toDate   = to   || new Date().toISOString().slice(0, 10);
 
-    // Query 1: custo por campanha/dia (sem segmentação por conversion action)
+    // Query 1: custo por campanha/dia — só campanhas gads
     const costQuery = `
       SELECT campaign.name, segments.date, metrics.cost_micros
       FROM campaign
@@ -37,12 +36,14 @@ export default async function handler(req, res) {
       ORDER BY segments.date DESC
     `;
 
-    // Query 2: leads "INF Lead Curso Grátis" por campanha/dia
+    // Query 2: all_conversions por campanha/dia/action — filtramos "INF Lead" no JS
+    // Não filtramos por action no WHERE pois causa 0 resultados; filtramos depois
     const leadsQuery = `
-      SELECT campaign.name, segments.date, metrics.all_conversions
+      SELECT campaign.name, segments.date, segments.conversion_action_name, metrics.all_conversions
       FROM campaign
       WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'
-        AND segments.conversion_action = 'customers/1310129916/conversionActions/1001616380'
+        AND campaign.name REGEXP_MATCH '.*gads.*'
+        AND metrics.all_conversions > 0
       ORDER BY segments.date DESC
     `;
 
@@ -74,18 +75,13 @@ export default async function handler(req, res) {
       return parsed;
     }
 
-    // Tentar com cada custId até funcionar
     let costParsed = null;
     let leadsParsed = null;
     let usedCustId = null;
 
     for (const custId of candidates) {
       const result = await runQuery(custId, costQuery);
-      if (result !== null) {
-        costParsed = result;
-        usedCustId = custId;
-        break;
-      }
+      if (result !== null) { costParsed = result; usedCustId = custId; break; }
     }
 
     if (!costParsed) {
@@ -95,7 +91,7 @@ export default async function handler(req, res) {
     leadsParsed = await runQuery(usedCustId, leadsQuery);
 
     // Processar custo
-    const spendMap = {}; // chave: "campaign|date"
+    const spendMap = {};
     for (const batch of costParsed) {
       for (const r of (batch.results || [])) {
         const key = `${r.campaign?.name}|${r.segments?.date}`;
@@ -103,31 +99,25 @@ export default async function handler(req, res) {
       }
     }
 
-    // Processar leads
-    const leadsMap = {}; // chave: "campaign|date"
+    // Processar leads: filtrar por "INF Lead" no nome da action
+    const leadsMap = {};
     if (leadsParsed) {
       for (const batch of leadsParsed) {
         for (const r of (batch.results || [])) {
+          const actionName = r.segments?.conversionActionName || "";
+          if (!actionName.includes("INF Lead")) continue;
           const key = `${r.campaign?.name}|${r.segments?.date}`;
           leadsMap[key] = (leadsMap[key] || 0) + Math.round(Number(r.metrics?.allConversions) || 0);
         }
       }
     }
 
-    // Unir: criar rows com todos os campaign/date que tiveram custo
     const rows = Object.entries(spendMap).map(([key, spend]) => {
       const [campaign, date] = key.split("|");
-      return {
-        campaign,
-        date,
-        spend,
-        leads: leadsMap[key] || 0,
-      };
+      return { campaign, date, spend, leads: leadsMap[key] || 0 };
     });
 
-    // debug
-    const leadsRawSample = leadsParsed ? (leadsParsed[0]?.results || []).slice(0,3) : [];
-    return res.status(200).json({ rows, leadsDebug: { batches: leadsParsed?.length || 0, sampleRows: leadsRawSample } });
+    return res.status(200).json({ rows });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
