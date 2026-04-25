@@ -112,20 +112,39 @@ export default async function handler(req, res) {
       }
     }
 
-    // Construir rows: por campanha/dia — leads atribuídos à primeira row de cada campanha
-    // (o frontend soma todos os r.leads de uma campanha para obter o total)
-    const campLeadsAssigned = {};
-    const rows = Object.entries(spendMap)
-      .sort(([a], [b]) => b.localeCompare(a)) // mais recente primeiro
-      .map(([key, spend]) => {
-        const [campaign, date] = key.split("|");
-        let leads = 0;
-        if (!campLeadsAssigned[campaign]) {
-          leads = leadsMap[campaign] || 0;
-          campLeadsAssigned[campaign] = true;
-        }
-        return { campaign, date, spend, leads };
-      });
+    // Calcular spend total por campanha para distribuição proporcional de leads
+    const totalSpendByCamp = {};
+    for (const [key, spend] of Object.entries(spendMap)) {
+      const [campaign] = key.split("|");
+      totalSpendByCamp[campaign] = (totalSpendByCamp[campaign] || 0) + spend;
+    }
+
+    // Distribuir leads proporcionalmente por dia (baseado na fração do gasto de cada dia)
+    // Isso garante que qualquer filtro de período mostre leads corretos
+    const allEntries = Object.entries(spendMap).sort(([a], [b]) => b.localeCompare(a));
+    const campLeadsRemaining = { ...leadsMap };
+    const campRowCount = {};
+    for (const [key] of allEntries) {
+      const [campaign] = key.split("|");
+      campRowCount[campaign] = (campRowCount[campaign] || 0) + 1;
+    }
+    let rowIdx = {};
+    const rows = allEntries.map(([key, spend]) => {
+      const [campaign, date] = key.split("|");
+      const campTotalSpend = totalSpendByCamp[campaign] || 1;
+      const totalLeadsCamp = leadsMap[campaign] || 0;
+      rowIdx[campaign] = (rowIdx[campaign] || 0) + 1;
+      const isLast = rowIdx[campaign] === campRowCount[campaign];
+      let leads;
+      if (isLast) {
+        // Última row recebe o restante (evita erro de arredondamento)
+        leads = campLeadsRemaining[campaign] || 0;
+      } else {
+        leads = Math.round(totalLeadsCamp * (spend / campTotalSpend));
+        campLeadsRemaining[campaign] = (campLeadsRemaining[campaign] || 0) - leads;
+      }
+      return { campaign, date, spend, leads };
+    });
 
     return res.status(200).json({ rows });
 
