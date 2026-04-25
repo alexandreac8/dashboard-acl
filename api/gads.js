@@ -1,4 +1,4 @@
-// v24 - leads from INF Lead Curso Grátis (filter by action name in JS)
+// v25 - leads query sem segments.date no SELECT (evita conflito de segmentos)
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     const fromDate = from || "2025-01-01";
     const toDate   = to   || new Date().toISOString().slice(0, 10);
 
-    // Query 1: custo por campanha/dia — só campanhas gads
+    // Query 1: custo por campanha/dia
     const costQuery = `
       SELECT campaign.name, segments.date, metrics.cost_micros
       FROM campaign
@@ -36,15 +36,15 @@ export default async function handler(req, res) {
       ORDER BY segments.date DESC
     `;
 
-    // Query 2: all_conversions por campanha/dia/action — filtramos "INF Lead" no JS
-    // Não filtramos por action no WHERE pois causa 0 resultados; filtramos depois
+    // Query 2: leads por campanha SEM segments.date no SELECT
+    // (combinar segments.date + segments.conversion_action_name no SELECT causa erro)
+    // Filtramos "INF Lead" no JS depois
     const leadsQuery = `
-      SELECT campaign.name, segments.date, segments.conversion_action_name, metrics.all_conversions
+      SELECT campaign.name, segments.conversion_action_name, metrics.all_conversions
       FROM campaign
       WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'
         AND campaign.name REGEXP_MATCH '.*gads.*'
         AND metrics.all_conversions > 0
-      ORDER BY segments.date DESC
     `;
 
     const mccId    = "6994391072";
@@ -99,23 +99,33 @@ export default async function handler(req, res) {
       }
     }
 
-    // Processar leads: filtrar por "INF Lead" no nome da action
-    const leadsMap = {};
+    // Processar leads: total por campanha (sem data), filtrando por "INF Lead"
+    const leadsMap = {}; // campaign -> total leads
     if (leadsParsed) {
       for (const batch of leadsParsed) {
         for (const r of (batch.results || [])) {
           const actionName = r.segments?.conversionActionName || "";
           if (!actionName.includes("INF Lead")) continue;
-          const key = `${r.campaign?.name}|${r.segments?.date}`;
-          leadsMap[key] = (leadsMap[key] || 0) + Math.round(Number(r.metrics?.allConversions) || 0);
+          const camp = r.campaign?.name || "";
+          leadsMap[camp] = (leadsMap[camp] || 0) + Math.round(Number(r.metrics?.allConversions) || 0);
         }
       }
     }
 
-    const rows = Object.entries(spendMap).map(([key, spend]) => {
-      const [campaign, date] = key.split("|");
-      return { campaign, date, spend, leads: leadsMap[key] || 0 };
-    });
+    // Construir rows: por campanha/dia — leads atribuídos à primeira row de cada campanha
+    // (o frontend soma todos os r.leads de uma campanha para obter o total)
+    const campLeadsAssigned = {};
+    const rows = Object.entries(spendMap)
+      .sort(([a], [b]) => b.localeCompare(a)) // mais recente primeiro
+      .map(([key, spend]) => {
+        const [campaign, date] = key.split("|");
+        let leads = 0;
+        if (!campLeadsAssigned[campaign]) {
+          leads = leadsMap[campaign] || 0;
+          campLeadsAssigned[campaign] = true;
+        }
+        return { campaign, date, spend, leads };
+      });
 
     return res.status(200).json({ rows });
 
