@@ -1281,31 +1281,28 @@ function DiarioPanel({ cfg, preco }) {
   }, [cfg.gadsClientId, cfg.gadsRefreshToken, cfg.gadsDeveloperToken]);
 
   // Busca dados do período selecionado com leads corretos por dia
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      setLoading(true); setError(null);
-      try {
-        const useAPI = cfg.gadsClientId && cfg.gadsRefreshToken && cfg.gadsDeveloperToken;
-        let gads, sales;
-        if (useAPI) {
-          const [periodData, salesData] = await Promise.all([
-            fetchGadsAPI(cfg, from, to),
-            cfg.csvUrl ? fetchSheetsGads(cfg, preco) : Promise.resolve([]),
-          ]);
-          gads = periodData;
-          sales = salesData;
-        } else {
-          const [g, s] = await Promise.all([fetchGadsReport(GADS_URL), cfg.csvUrl ? fetchSheetsGads(cfg, preco) : []]);
-          gads = g; sales = s;
-        }
-        if (active) { setGadsRows(gads); setSalesRows(sales); setLoaded(true); }
-      } catch(e) { if (active) setError(e.message); }
-      finally { if (active) setLoading(false); }
-    }
-    load();
-    return () => { active = false; };
-  }, [cfg.gadsClientId, cfg.gadsRefreshToken, cfg.gadsDeveloperToken, cfg.gadsUrl, cfg.csvUrl, preco, from, to]);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const useAPI = cfg.gadsClientId && cfg.gadsRefreshToken && cfg.gadsDeveloperToken;
+      let gads, sales;
+      if (useAPI) {
+        const [periodData, salesData] = await Promise.all([
+          fetchGadsAPI(cfg, from, to),
+          cfg.csvUrl ? fetchSheetsGads(cfg, preco) : Promise.resolve([]),
+        ]);
+        gads = periodData;
+        sales = salesData;
+      } else {
+        const [g, s] = await Promise.all([fetchGadsReport(GADS_URL), cfg.csvUrl ? fetchSheetsGads(cfg, preco) : []]);
+        gads = g; sales = s;
+      }
+      setGadsRows(gads); setSalesRows(sales); setLoaded(true);
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [cfg, preco, from, to, GADS_URL]);
+
+  useEffect(() => { load(); }, [load]);
 
   // Filter gadsRows by period
   // gadsRows já é o período selecionado; allGadsRows são os 90 dias para métricas acumuladas
