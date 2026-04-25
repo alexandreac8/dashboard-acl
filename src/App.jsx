@@ -617,6 +617,7 @@ function AdsetRow({adset,mode,acaoMode}){
         <td style={{padding:"9px 12px",textAlign:"right"}}><Cell v={fmt.pct(adset.ctr)} color={C.muted}/></td>
         <td style={{padding:"9px 12px",textAlign:"right"}}><Cell v={fmt.brl(rev)} color={C.green}/></td>
         <td style={{padding:"9px 12px",textAlign:"right"}}><Cell v={fmt.num(sales)}/></td>
+        <td style={{padding:"9px 12px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.purple}}>{(isCap?adset.upsellCap:adset.upsellSale)>0?`+${isCap?adset.upsellCap:adset.upsellSale} up`:<span style={{color:C.muted}}>—</span>}</td>
         <td style={{padding:"9px 12px",textAlign:"right"}}><CvrBadge v={adset.cvr}/></td>
         <td style={{padding:"9px 12px",textAlign:"right"}}><RoasBadge v={roas}/></td>
         {acaoMode&&isCap&&<td style={{padding:"9px 12px",textAlign:"center",borderLeft:`2px solid #fcd34d`}}><AdsetActionBadge roas={roas}/></td>}
