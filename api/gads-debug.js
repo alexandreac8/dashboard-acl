@@ -18,11 +18,12 @@ export default async function handler(req, res) {
       "Content-Type": "application/json"
     };
 
-    // Test: exact same query as in gads.js leadsQuery (with segments.date)
-    const from = "2026-04-20", to = "2026-04-24";
-    const leadsQuery = `
-      SELECT campaign.name, segments.date, segments.conversion_action_name, metrics.all_conversions
-      FROM campaign
+    const from = "2026-04-18", to = "2026-04-25";
+
+    // Testa campaign_conversion_action: permite date + conversion_action.name juntos?
+    const query = `
+      SELECT campaign.name, segments.date, conversion_action.name, metrics.all_conversions
+      FROM campaign_conversion_action
       WHERE segments.date BETWEEN '${from}' AND '${to}'
         AND campaign.name REGEXP_MATCH '.*gads.*'
         AND metrics.all_conversions > 0
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
 
     const r = await fetch(
       `https://googleads.googleapis.com/v24/customers/${custId}/googleAds:searchStream`,
-      { method: "POST", headers, body: JSON.stringify({ query: leadsQuery }) }
+      { method: "POST", headers, body: JSON.stringify({ query }) }
     );
     const raw = await r.text();
 
@@ -48,14 +49,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ type: "not_array", parsed });
     }
 
-    // Extract rows
     const rows = [];
     for (const batch of parsed) {
       for (const row of (batch.results || [])) {
         rows.push({
           campaign: row.campaign?.name,
           date: row.segments?.date,
-          action: row.segments?.conversionActionName,
+          action: row.conversionAction?.name,
           allConv: row.metrics?.allConversions,
         });
       }
@@ -64,11 +64,10 @@ export default async function handler(req, res) {
     const infRows = rows.filter(r => (r.action||"").includes("INF Lead"));
     return res.status(200).json({
       type: "ok",
-      totalBatches: parsed.length,
+      resource: "campaign_conversion_action",
       totalRows: rows.length,
       infLeadRows: infRows.length,
-      infSample: infRows.slice(0, 5),
-      allSample: rows.slice(0, 10),
+      infSample: infRows.slice(0, 10),
     });
   } catch(err) { return res.status(500).json({ error: err.message }); }
 }
