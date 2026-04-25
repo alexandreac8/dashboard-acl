@@ -271,6 +271,8 @@ function crunchAll(metaAds, salesRows, from, to) {
     const revSale=bySale.reduce((a,s)=>a+s.value,0); // já é a soma correta
     const revLag =lag.reduce((a,s)=>a+s.value,0);
     const cvr    =leads>0?(byCap.length/leads)*100:null;
+    const upsellCap  = byCap.filter(s=>s.is_up).length;
+    const upsellSale = bySale.filter(s=>s.is_up).length;
     // avgDays: média de dias entre capture_date e sale_date (só vendas com capture_date)
     const daysArr=bySale.filter(s=>s.capture_date).map(s=>Math.max(0,Math.round((new Date(s.sale_date)-new Date(s.capture_date))/86400000)));
     const daysCount=daysArr.length;
@@ -286,6 +288,7 @@ function crunchAll(metaAds, salesRows, from, to) {
       salesNow:saleNow.length, cvr,
       cpl:leads>0?spend/leads:null,
       avgDays, daysCount,
+      upsellCap, upsellSale,
     };
   }
 
@@ -400,13 +403,17 @@ async function fetchSheets(cfg,preco){
       // DATA WEBINARIO = quando o lead se cadastrou no webinar (captura)
       // Se vazio, capture_date fica null → só entra no Acumulado, nunca no Por Captura
       const capture_date = parseDate((r[+cfg.colCapture]||"").trim()) || null;
+      // Col 6 (G) = valor real da venda; se maior que preco base, é upsell
+      const rawVal = parseFloat((r[6]||"").replace(",","."))||0;
+      const value  = rawVal > 0 ? rawVal : preco;
       return {
         capture_date,
         sale_date,
         campaign:  r[+cfg.colCampaign]||"",
         adset:     r[+cfg.colAdset]||"",
         creative:  r[+cfg.colCreative]||"",
-        value:     preco,
+        value,
+        is_up: rawVal > preco,
       };
     });
 }
@@ -661,6 +668,7 @@ function CampaignRow({camp,mode,idx,acaoMode}){
         <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.pct(camp.ctr)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green}}>{fmt.brl(rev)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.text}}>{fmt.num(sales)}</td>
+        <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.purple}}>{(isCap?camp.upsellCap:camp.upsellSale)>0?`+${isCap?camp.upsellCap:camp.upsellSale} up`:<span style={{color:C.muted}}>—</span>}</td>
         <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right"}}><CvrBadge v={camp.cvr}/></td>
         <td style={{padding:"13px 14px",textAlign:"right",background:roasBg,borderRadius:4}}><RoasBadge v={roas}/></td>
         {!isCap&&<td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{camp.avgDays!=null?`${Math.round(camp.avgDays)}d`:"—"}</td>}
@@ -673,8 +681,8 @@ function CampaignRow({camp,mode,idx,acaoMode}){
                 <thead style={{position:"relative",zIndex:10}}>
                   <tr style={{borderBottom:`1px solid ${C.border}`}}>
                     <th style={{width:28}}/>
-                    {["Conjunto · web_utm_term","Gasto","Leads","CPL","CTR","Faturamento","Vendas","Lead→Venda"].map((h,i)=>(
-                      <th key={h} style={{padding:"6px 12px",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",textAlign:i===0?"left":"right",whiteSpace:"nowrap"}}>{h}</th>
+                    {["Conjunto · web_utm_term","Gasto","Leads","CPL","CTR","Faturamento","Vendas","Upsell","Lead→Venda"].map((h,i)=>(
+                      <th key={h} style={{padding:"6px 12px",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:h==="Upsell"?C.purple+"bb":C.muted,fontFamily:"'JetBrains Mono',monospace",textAlign:i===0?"left":"right",whiteSpace:"nowrap"}}>{h}</th>
                     ))}
                     <th style={{padding:"6px 12px",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"88",fontFamily:"'JetBrains Mono',monospace",textAlign:"right"}}>ROAS</th>
                     {acaoMode&&isCap&&<th style={{padding:"6px 12px",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:"#d97706",fontFamily:"'JetBrains Mono',monospace",textAlign:"center",borderLeft:`2px solid #fcd34d`}}>AÇÃO</th>}
@@ -1311,28 +1319,61 @@ function DiarioPanel({ cfg, preco }) {
       {error && <div style={{background:"#fef2f2",border:`1px solid #fca5a5`,borderRadius:5,padding:"9px 14px",marginBottom:16,color:C.red,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>⚠ {error}</div>}
 
       {/* KPIs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:20}}>
-        <div style={{background:"#c8d3dc",border:`1px solid #a0adb8`,borderRadius:6,padding:"14px 16px",position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${C.green}00,${C.green},${C.green}00)`}}/>
-          <KPI label="Lucro Total" value={fmt.brl(totalRev - totalSpend)} color={totalRev-totalSpend>=0?C.green:C.red} dark/>
-        </div>
-        <div style={{background:C.card,border:`1px solid ${C.red}44`,borderRadius:6,padding:"14px 16px"}}>
-          <KPI label="Gasto Total" value={fmt.brl(totalSpend)} color={C.red}/>
-        </div>
-        <div style={{background:C.card,border:`1px solid ${C.teal}44`,borderRadius:6,padding:"14px 16px"}}>
-          <KPI label="Leads" value={fmt.num(totalLeads)} color={C.teal} sub={`CPL ${fmt.brl(totalCpl)}`}/>
-        </div>
-        <div style={{background:C.card,border:`1px solid ${C.blue}44`,borderRadius:6,padding:"14px 16px"}}>
-          <KPI label="Vendas Geradas" value={fmt.num(totalGeradas)} color={C.blue} sub={fmt.brl(totalGeradas * preco)}/>
-        </div>
-        <div style={{background:C.card,border:`2px solid ${C.green}55`,borderRadius:6,padding:"14px 16px",position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${C.green}00,${C.green},${C.green}00)`}}/>
-          <KPI label="Vendas Acumuladas" value={fmt.num(totalSales)} color={C.green} sub={fmt.brl(totalRev)}/>
-        </div>
-        <div style={{background:C.card,border:`1px solid ${C.gold}44`,borderRadius:6,padding:"14px 16px"}}>
-          <KPI label="ROAS ACUMULADO" value={fmt.x(totalSpend>0?totalRev/totalSpend:null)} color={(totalSpend>0&&totalRev/totalSpend>=1)?C.green:C.red} sub="período selecionado"/>
-        </div>
-      </div>
+      {(()=>{
+        const lucroGads = totalRev - totalSpend;
+        const lucroColor = lucroGads >= 0 ? C.green : C.red;
+        const roasAcum  = totalSpend > 0 ? totalRev / totalSpend : null;
+        return (
+          <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+
+            {/* BOX FINANCEIRO */}
+            <div style={{flex:"1.2 1 0",minWidth:200,background:C.card,border:`1.5px solid ${C.border2}`,borderRadius:8,padding:"14px 16px",display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                <span style={{fontSize:12,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:"nowrap"}}>Gasto:</span>
+                <span style={{fontSize:14,fontWeight:700,color:C.red,fontFamily:"'JetBrains Mono',monospace"}}>−{fmt.brl(totalSpend)}</span>
+              </div>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                <span style={{fontSize:12,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:"nowrap"}}>Vendas:</span>
+                <span style={{fontSize:14,fontWeight:700,color:C.green,fontFamily:"'JetBrains Mono',monospace"}}>+{fmt.brl(totalRev)}</span>
+              </div>
+              <div style={{height:1,background:C.border,margin:"2px 0"}}/>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8}}>
+                <span style={{fontSize:13,fontWeight:800,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif",whiteSpace:"nowrap"}}>LUCRO:</span>
+                <span style={{fontSize:18,fontWeight:800,color:lucroColor,fontFamily:"'JetBrains Mono',monospace"}}>{lucroGads>=0?"+":""}{fmt.brl(lucroGads)}</span>
+              </div>
+            </div>
+
+            {/* ROAS */}
+            <div style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${(roasAcum&&roasAcum>=1)?C.green+"44":C.red+"44"}`,borderRadius:6,padding:"14px 16px"}}>
+              <KPI label="ROAS ACUMULADO" value={fmt.x(roasAcum)} color={(roasAcum&&roasAcum>=1)?C.green:C.red}
+                sub="período selecionado" labelSize={11} valueSize={28} subSize={13}/>
+            </div>
+
+            {/* LEADS */}
+            <div style={{flex:"1 1 0",minWidth:140,background:C.card,border:`1px solid ${C.teal}44`,borderRadius:6,padding:"14px 16px"}}>
+              <KPI label="Leads" value={fmt.num(totalLeads)} color={C.teal}
+                sub={`CPL ${fmt.brl(totalCpl)}`} subColor={C.gold}
+                labelSize={11} valueSize={28} subSize={13}/>
+            </div>
+
+            {/* VENDAS GERADAS + ACUMULADAS */}
+            <div style={{flex:"1.5 1 0",minWidth:200,background:"#f8fafc",border:`1px solid ${C.border}`,borderRadius:6,padding:"14px 16px",display:"flex",gap:20}}>
+              <div>
+                <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:3}}>Vendas Geradas</div>
+                <div style={{fontSize:20,fontWeight:700,color:C.blue,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.num(totalGeradas)}</div>
+                <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:3}}>{fmt.brl(totalGeradas * preco)}</div>
+              </div>
+              <div style={{width:1,background:C.border}}/>
+              <div>
+                <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:3}}>Vendas Acumuladas</div>
+                <div style={{fontSize:20,fontWeight:700,color:C.green,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.num(totalSales)}</div>
+                <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:3}}>{fmt.brl(totalRev)}</div>
+              </div>
+            </div>
+
+          </div>
+        );
+      })()}
 
       {/* Tabela campanhas */}
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,overflow:"visible"}}>
@@ -1649,6 +1690,7 @@ export default function Dashboard(){
                       <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>CTR</th>
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Faturamento</th>
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Vendas</th>
+                      <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.purple+"bb",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Upsell</th>
                       <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Lead→Venda</th>
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"88",fontFamily:"'JetBrains Mono',monospace"}}>ROAS</th>
                       {!isCap&&<th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>⏱ CV</th>}
