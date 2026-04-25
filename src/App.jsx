@@ -668,7 +668,7 @@ function CampaignRow({camp,mode,idx,acaoMode}){
         <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{fmt.pct(camp.ctr)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green}}>{fmt.brl(rev)}</td>
         <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.text}}>{fmt.num(sales)}</td>
-        <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.purple}}>{(isCap?camp.upsellCap:camp.upsellSale)>0?`+${isCap?camp.upsellCap:camp.upsellSale} up`:<span style={{color:C.muted}}>—</span>}</td>
+        <td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.purple}}>{(isCap?camp.upsellCap:camp.upsellSale)>0?`+${isCap?camp.upsellCap:camp.upsellSale} up`:<span style={{color:C.muted}}>—</span>}</td>
         <td className="hide-mobile" style={{padding:"13px 14px",textAlign:"right"}}><CvrBadge v={camp.cvr}/></td>
         <td style={{padding:"13px 14px",textAlign:"right",background:roasBg,borderRadius:4}}><RoasBadge v={roas}/></td>
         {!isCap&&<td style={{padding:"13px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{camp.avgDays!=null?`${Math.round(camp.avgDays)}d`:"—"}</td>}
@@ -1250,69 +1250,85 @@ function Tip({ text }) {
 
 // ── Diario Panel ──────────────────────────────────────────────────────────────
 function DiarioPanel({ cfg, preco }) {
-  const [gadsRows,  setGadsRows]  = useState([]);
-  const [salesRows, setSalesRows] = useState([]);
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState(null);
-  const [loaded,    setLoaded]    = useState(false);
-  const [from,      setFrom]      = useState(daysAgo(7));
-  const [to,        setTo]        = useState(today());
-  const [fromTmp,   setFromTmp]   = useState(daysAgo(7));
-  const [toTmp,     setToTmp]     = useState(today());
+  const [gadsRows,    setGadsRows]    = useState([]); // período selecionado (leads corretos)
+  const [allGadsRows, setAllGadsRows] = useState([]); // 90 dias (só gasto, para métricas acumuladas)
+  const [salesRows,   setSalesRows]   = useState([]);
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState(null);
+  const [loaded,      setLoaded]      = useState(false);
+  const [from,        setFrom]        = useState(daysAgo(7));
+  const [to,          setTo]          = useState(today());
+  const [fromTmp,     setFromTmp]     = useState(daysAgo(7));
+  const [toTmp,       setToTmp]       = useState(today());
 
   const GADS_URL = cfg.gadsUrl;
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      // Usa API direta se tiver credenciais, senão cai no CSV
+  // Busca 90 dias de GASTO uma vez (Google Ads API agrupa leads em 1 data em ranges longos,
+  // então usamos esses dados só para métricas acumuladas/fixas de spend)
+  useEffect(() => {
+    let active = true;
+    async function loadAll() {
       const useAPI = cfg.gadsClientId && cfg.gadsRefreshToken && cfg.gadsDeveloperToken;
-      let gads, sales;
-      if (useAPI) {
-        // Busca dados do período selecionado (from/to) — leads reais por dia via campaign_conversion_action
-        const [gadsFromAPI, salesData] = await Promise.all([
-          fetchGadsAPI(cfg, from, to),
-          cfg.csvUrl ? fetchSheetsGads(cfg, preco) : Promise.resolve([]),
-        ]);
-        gads = gadsFromAPI;
-        sales = salesData;
-      } else {
-        const gadsPromise = fetchGadsReport(GADS_URL);
-        const [g, s] = await Promise.all([gadsPromise, cfg.csvUrl ? fetchSheetsGads(cfg, preco) : []]);
-        gads = g; sales = s;
-      }
-      setGadsRows(gads);
-      setSalesRows(sales);
-      setLoaded(true);
-    } catch(e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, [cfg, preco, from, to]);
+      if (!useAPI) return;
+      try {
+        const data = await fetchGadsAPI(cfg, daysAgo(90), today());
+        if (active) setAllGadsRows(data);
+      } catch(e) {}
+    }
+    loadAll();
+    return () => { active = false; };
+  }, [cfg.gadsClientId, cfg.gadsRefreshToken, cfg.gadsDeveloperToken]);
 
-  useEffect(() => { load(); }, [load]);
+  // Busca dados do período selecionado com leads corretos por dia
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      setLoading(true); setError(null);
+      try {
+        const useAPI = cfg.gadsClientId && cfg.gadsRefreshToken && cfg.gadsDeveloperToken;
+        let gads, sales;
+        if (useAPI) {
+          const [periodData, salesData] = await Promise.all([
+            fetchGadsAPI(cfg, from, to),
+            cfg.csvUrl ? fetchSheetsGads(cfg, preco) : Promise.resolve([]),
+          ]);
+          gads = periodData;
+          sales = salesData;
+        } else {
+          const [g, s] = await Promise.all([fetchGadsReport(GADS_URL), cfg.csvUrl ? fetchSheetsGads(cfg, preco) : []]);
+          gads = g; sales = s;
+        }
+        if (active) { setGadsRows(gads); setSalesRows(sales); setLoaded(true); }
+      } catch(e) { if (active) setError(e.message); }
+      finally { if (active) setLoading(false); }
+    }
+    load();
+    return () => { active = false; };
+  }, [cfg.gadsClientId, cfg.gadsRefreshToken, cfg.gadsDeveloperToken, cfg.gadsUrl, cfg.csvUrl, preco, from, to]);
 
   // Filter gadsRows by period
-  const filteredGads = gadsRows.filter(r => r.date >= from && r.date <= to);
-  // Filter salesRows by period
+  // gadsRows já é o período selecionado; allGadsRows são os 90 dias para métricas acumuladas
+  const filteredGads = gadsRows; // já está no período correto
   const filteredSales = salesRows.filter(r => r.sale_date && r.sale_date >= from && r.sale_date <= to);
 
-  const { totalSpend, totalLeads, totalSales, totalRev, totalCpl, totalGeradas, campMap, salesMap, allDatesMap } = crunchGads(filteredGads, filteredSales, salesRows, gadsRows, preco, from, to);
+  const { totalSpend, totalLeads, totalSales, totalRev, totalCpl, totalGeradas, campMap, salesMap, allDatesMap } = crunchGads(filteredGads, filteredSales, salesRows, allGadsRows.length > 0 ? allGadsRows : gadsRows, preco, from, to);
 
   const setPreset = (f, t) => { setFrom(f); setTo(t); setFromTmp(f); setToTmp(t); };
 
   // ROAS 15D FIXO
   const allSales15D  = salesRows.filter(s => s.capture_date && s.capture_date >= CUTOFF15);
   const rev15DFixed  = allSales15D.reduce((s,r)=>s+(r.value||preco),0);
-  const spend15DFixed= gadsRows.filter(r => r.date >= CUTOFF15).reduce((s,r)=>s+r.spend,0);
+  const spend15DFixed= (allGadsRows.length>0?allGadsRows:gadsRows).filter(r => r.date >= CUTOFF15).reduce((s,r)=>s+r.spend,0);
   const roas15D      = spend15DFixed > 0 ? rev15DFixed / spend15DFixed : null;
   // ROAS 7D FIXO
   const allSales7D   = salesRows.filter(s => s.capture_date && s.capture_date >= CUTOFF7);
   const rev7DFixed   = allSales7D.reduce((s,r)=>s+(r.value||preco),0);
-  const spend7DFixed = gadsRows.filter(r => r.date >= CUTOFF7).reduce((s,r)=>s+r.spend,0);
+  const spend7DFixed = (allGadsRows.length>0?allGadsRows:gadsRows).filter(r => r.date >= CUTOFF7).reduce((s,r)=>s+r.spend,0);
   const roas7D       = spend7DFixed > 0 ? rev7DFixed / spend7DFixed : null;
 
   // campaigns sempre do gadsRows completo (não filtrado)
   const allCampMap = {};
-  for (const r of gadsRows) {
+  for (const r of (allGadsRows.length>0?allGadsRows:gadsRows)) {
     const c = r.campaign;
     if (!allCampMap[c]) allCampMap[c] = { campaign: c, spend: 0, leads: 0 };
     allCampMap[c].spend += r.spend;
@@ -1743,7 +1759,7 @@ export default function Dashboard(){
                       <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>CTR</th>
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Faturamento</th>
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Vendas</th>
-                      <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.purple+"bb",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Upsell</th>
+                      <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.purple+"bb",fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Upsell</th>
                       <th className="hide-mobile" style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Lead→Venda</th>
                       <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"88",fontFamily:"'JetBrains Mono',monospace"}}>ROAS</th>
                       {!isCap&&<th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>⏱ CV</th>}
