@@ -464,7 +464,7 @@ function ModeToggle({mode,onChange}){
 }
 
 // ── Preço editável ────────────────────────────────────────────────────────────
-function PriceWidget({preco,onChange}){
+function PriceWidget({preco,onChange,label}){
   const [editing,setEditing]=useState(false);
   const [draft,setDraft]=useState(String(preco));
   const confirm=()=>{
@@ -474,7 +474,7 @@ function PriceWidget({preco,onChange}){
   };
   return(
     <div className="price-widget" style={{display:"flex",alignItems:"center",gap:8,background:"#f8fafc",border:`1px solid ${C.border2}`,borderRadius:6,padding:"6px 12px"}}>
-      <span className="price-label" style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>Preço do Produto</span>
+      <span className="price-label" style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"nowrap"}}>{label||"Preço do Produto"}</span>
       {editing?(
         <>
           <span style={{color:C.muted,fontSize:11}}>R$</span>
@@ -1519,6 +1519,7 @@ export default function Dashboard(){
   const [mode,setMode]   = useState("capture");
   const [acaoMode,setAcaoMode] = useState(false);
   const [preco,setPreco] = useState(810);
+  const [precoUpsell,setPrecoUpsell] = useState(210);
   const [rows,setRows]   = useState([]);
   const [loading,setLd]  = useState(false);
   const [error,setErr]   = useState(null);
@@ -1529,6 +1530,8 @@ export default function Dashboard(){
     setPreco(v);
     if(isDemo) setRows(crunchAll(DEMO_META,DEMO_SALES_FIXED.map(s=>({...s,value:v})),from,to));
   };
+
+  const handlePrecoUpsell = (v) => { setPrecoUpsell(v); };
 
   const load=useCallback(async(c,f,t,p)=>{
     if(!c.metaToken||(!c.csvUrl&&!c.sheetsApiKey)){
@@ -1548,6 +1551,8 @@ export default function Dashboard(){
   const apply=()=>{
     load(cfg,from,to,preco);
   };
+
+  useEffect(() => { load(cfg, from, to, preco); }, []);
 
   const isCap=mode==="capture";
   const totSpend    =rows.reduce((s,r)=>s+r.spend,0);
@@ -1648,6 +1653,7 @@ export default function Dashboard(){
               </div>
               <div style={{display:"flex",gap:10,alignItems:"center"}}>
                 <PriceWidget preco={preco} onChange={handlePreco}/>
+                <PriceWidget preco={precoUpsell} onChange={handlePrecoUpsell} label="Valor Upsell"/>
                 <ModeToggle mode={mode} onChange={setMode}/>
               </div>
             </div>

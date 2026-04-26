@@ -36,11 +36,10 @@ export default async function handler(req, res) {
       ORDER BY segments.date DESC
     `;
 
-    // Query 2: leads por campanha/dia via campaign_conversion_action
-    // Esse recurso permite segments.date + conversion_action.name juntos (sem o bug do resource campaign)
+    // Query 2: leads por campanha/dia via segments.conversion_action_name no resource campaign
     const leadsQuery = `
-      SELECT campaign.name, segments.date, conversion_action.name, metrics.all_conversions
-      FROM campaign_conversion_action
+      SELECT campaign.name, segments.date, segments.conversion_action_name, metrics.all_conversions
+      FROM campaign
       WHERE segments.date BETWEEN '${fromDate}' AND '${toDate}'
         AND campaign.name REGEXP_MATCH '.*gads.*'
         AND metrics.all_conversions > 0
@@ -103,7 +102,7 @@ export default async function handler(req, res) {
     if (leadsParsed) {
       for (const batch of leadsParsed) {
         for (const r of (batch.results || [])) {
-          const actionName = r.conversionAction?.name || "";
+          const actionName = r.segments?.conversionActionName || "";
           if (!actionName.includes("INF Lead")) continue;
           const key = `${r.campaign?.name}|${r.segments?.date}`;
           leadsPerDay[key] = (leadsPerDay[key] || 0) + Math.round(Number(r.metrics?.allConversions) || 0);
