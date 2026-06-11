@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Fragment } from "react";
 
 
 const GLOBAL_CSS = `
@@ -233,6 +233,17 @@ function isSameDay(d1, d2) {
   return d1.getFullYear() === d2.getFullYear() &&
     d1.getMonth() === d2.getMonth() &&
     d1.getDate() === d2.getDate();
+}
+
+// Parse de valor monetário tolerante: "47" "47,00" "R$ 1.234,56" "1234.56" → number | null
+function parseBRL(s) {
+  if (s == null) return null;
+  let t = String(s).trim().replace(/r\$/i, "").replace(/\s/g, "");
+  if (!t) return null;
+  // Se tem vírgula, ela é o separador decimal (pt-BR): remove pontos de milhar, troca vírgula por ponto
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  const v = parseFloat(t);
+  return isNaN(v) ? null : v;
 }
 
 // ── Demo Semanal ──────────────────────────────────────────────────────────────
@@ -761,8 +772,10 @@ const DEFAULT_CFG={
   gadsDeveloperToken:"4Ov9qn2jbS4yfoQoTI6YlA",
   gadsCustomerId:"1310129916",
   csvUrl:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRQndaZj_w3JivW0cGLbMEuNloBPrhhKZazg64t-_qRLuwwrSdyuMVwRv0HwXEhdaVUuFML-0bVyGrZ/pub?gid=0&single=true&output=csv",
+  outrosCsvUrl:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRQndaZj_w3JivW0cGLbMEuNloBPrhhKZazg64t-_qRLuwwrSdyuMVwRv0HwXEhdaVUuFML-0bVyGrZ/pub?gid=584195326&single=true&output=csv",
   sheetsId:"",sheetsApiKey:"",sheetsRange:"Vendas!A:H",
   colSale:"0",colCapture:"7",colCampaign:"2",colAdset:"5",colCreative:"4",colSource:"3",
+  colProduto:"9",colValor:"10",
 };
 
 function ConfigPanel({cfg,onSave}){
@@ -791,6 +804,8 @@ function ConfigPanel({cfg,onSave}){
       <Sec t="Planilha de Vendas (Google Sheets CSV)">
         <Lbl c="URL do CSV público (Arquivo → Publicar na web → CSV)"/>
         <Inp k="csvUrl" ph="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"/>
+        <Lbl c="URL do CSV público — aba OUTROS PRODUTOS (low-tickets do semanal)"/>
+        <Inp k="outrosCsvUrl" ph="https://docs.google.com/spreadsheets/d/e/.../pub?gid=XXXXX&output=csv"/>
         <Lbl c="URL Planilha Google Ads (RELATORIO_DASH_CLAUDE)"/>
         <Inp k="gadsUrl" ph="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"/>
         <p style={{fontSize:10,color:C.muted,marginBottom:12}}>Colunas detectadas automaticamente conforme sua planilha:</p>
@@ -801,6 +816,8 @@ function ConfigPanel({cfg,onSave}){
             ["colCampaign","2 — CAMPAIGN"],
             ["colAdset","5 — WEB_UTM (GRUPO)"],
             ["colCreative","4 — AD NAME"],
+            ["colProduto","9 — NOME PRODUTO (aba Outros)"],
+            ["colValor","10 — TICKET R$ (aba Outros)"],
           ].map(([k,l])=>(
             <div key={k}>
               <Lbl c={l}/>
@@ -810,7 +827,7 @@ function ConfigPanel({cfg,onSave}){
             </div>
           ))}
         </div>
-        <p style={{fontSize:10,color:C.muted,marginTop:4}}>⚠ Valor da venda = campo "Preço do Produto" no topo do dashboard.</p>
+        <p style={{fontSize:10,color:C.muted,marginTop:4}}>⚠ Perpétuo/Diário e Curso Completo do Semanal: valor = "Preço do Produto" no topo. Low-tickets do Semanal vêm da aba OUTROS PRODUTOS (colunas NOME DO PRODUTO + TICKET).</p>
       </Sec>
       <button onClick={()=>onSave(f)} style={{padding:"10px 26px",background:C.blue,color:"#fff",border:"none",borderRadius:5,cursor:"pointer",fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:600,fontSize:13}}>
         Salvar e Conectar
@@ -890,13 +907,26 @@ function SemanalPanel({ cfg, preco }) {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState(null);
   const [loaded,   setLoaded]   = useState(false);
-  const [visible,  setVisible]  = useState(8);
+  const [from,     setFrom]     = useState("");                // filtro de período (vazio = sem limite)
+  const [to,       setTo]       = useState("");
+  const [sort,     setSort]     = useState({ key: "ciclo", dir: -1 });
+  const sortBy = (key) => setSort(p => p.key === key ? { key, dir: p.dir * -1 } : { key, dir: -1 });
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggle = (ciclo) => setExpanded(prev => {
+    const next = new Set(prev);
+    next.has(ciclo) ? next.delete(ciclo) : next.add(ciclo);
+    return next;
+  });
 
   const load = useCallback(async () => {
     if (!cfg.csvUrl && !cfg.metaAccountId) { setLoaded(true); return; }
     setLoading(true); setError(null);
     try {
-      const s = cfg.csvUrl ? await fetchSheetsSemanal(cfg, preco) : [];
+      const [completo, outros] = await Promise.all([
+        cfg.csvUrl       ? fetchSheetsSemanal(cfg, preco) : [],
+        cfg.outrosCsvUrl ? fetchSheetsOutros(cfg)         : [],
+      ]);
+      const s = [...completo, ...outros];
       setSales(s);
       if (cfg.metaAccountId && cfg.metaToken) {
         const metaDaily = await fetchMetaM6Daily(cfg);
@@ -910,30 +940,80 @@ function SemanalPanel({ cfg, preco }) {
   }, [cfg, preco]);
 
   // Load on mount
-  useEffect(() => { load(); }, [cfg.metaToken, cfg.csvUrl]);
+  useEffect(() => { load(); }, [cfg.metaToken, cfg.csvUrl, cfg.outrosCsvUrl]);
 
-  // Group sales by ciclo_sem
+  // Group sales by ciclo_sem (+ breakdown por produto)
   const cycleMap = {};
   for (const s of sales) {
     const c = s.ciclo_sem;
     if (!c) continue;
-    if (!cycleMap[c]) cycleMap[c] = { ciclo: c, leads: 0, salesPitch: 0, salesAcum: 0, revPitch: 0, revAcum: 0 };
-    cycleMap[c].leads++;
-    cycleMap[c].salesAcum++;
-    cycleMap[c].revAcum += s.value;
-    if (s.is_pitch) { cycleMap[c].salesPitch++; cycleMap[c].revPitch += s.value; }
+    if (!cycleMap[c]) cycleMap[c] = { ciclo: c, leads: 0, salesPitch: 0, salesAcum: 0, revPitch: 0, revAcum: 0, cursoPitch: 0, cursoAcum: 0, cursoRev: 0, outrosAcum: 0, outrosRev: 0, products: {} };
+    const cm = cycleMap[c];
+    if (s.countsAsLead !== false) cm.leads++;
+    cm.salesAcum++;
+    cm.revAcum += s.value;
+    if (s.is_pitch) { cm.salesPitch++; cm.revPitch += s.value; }
+    // Contadores por grupo de produto
+    if (s.isCompleto) { cm.cursoAcum++; cm.cursoRev += s.value; if (s.is_pitch) cm.cursoPitch++; }  // CURSO COMPLETO
+    else              { cm.outrosAcum++; cm.outrosRev += s.value; }          // OUTROS CURSOS
+    const p = s.produto || "—";
+    if (!cm.products[p]) cm.products[p] = { produto: p, count: 0, rev: 0 };
+    cm.products[p].count++;
+    cm.products[p].rev += s.value;
   }
 
-  // Sort descending by webinar date
-  const allCycles = Object.values(cycleMap).sort((a, b) => {
-    const da = parseCicloDate(a.ciclo), db = parseCicloDate(b.ciclo);
-    if (!da || !db) return 0;
-    return db - da;
+  const hasMeta     = !!(cfg.metaAccountId && cfg.metaToken);
+
+  // Enriquece cada ciclo com gasto/CPL/ROAS (vêm do Meta) + data do webinário
+  const enriched = Object.values(cycleMap).map(c => {
+    const spend = spendMap[c.ciclo] || 0;
+    const cpl   = spend > 0 && c.leads > 0 ? spend / c.leads : null;
+    const roas  = spend > 0 ? c.revAcum / spend : null;
+    const d     = parseCicloDate(c.ciclo);
+    const dateStr = d ? fmtLocalDate(d) : "";
+    return { ...c, spend, cpl, roas, dateStr };
   });
 
-  const cycles      = allCycles.slice(0, visible);
-  const hasMore     = allCycles.length > visible;
-  const hasMeta     = !!(cfg.metaAccountId && cfg.metaToken);
+  // Filtro por período (data do webinário do ciclo)
+  const hasFilter = !!(from || to);
+  const filtered = enriched.filter(c =>
+    (!from || (c.dateStr && c.dateStr >= from)) &&
+    (!to   || (c.dateStr && c.dateStr <= to))
+  );
+
+  // Ordenação (clicável no cabeçalho)
+  const SORT_GET = {
+    ciclo:      c => parseCicloDate(c.ciclo)?.getTime() ?? 0,
+    leads:      c => c.leads,
+    spend:      c => c.spend,
+    cpl:        c => c.cpl ?? -1,
+    cursoPitch: c => c.cursoPitch,
+    cursoAcum:  c => c.cursoAcum,
+    cursoRev:   c => c.cursoRev,
+    outrosAcum: c => c.outrosAcum,
+    outrosRev:  c => c.outrosRev,
+    revAcum:    c => c.revAcum,
+    roas:       c => c.roas ?? -1,
+  };
+  const getter = SORT_GET[sort.key] || SORT_GET.ciclo;
+  const cycles = [...filtered].sort((a, b) => {
+    const va = getter(a), vb = getter(b);
+    return va < vb ? -sort.dir : va > vb ? sort.dir : 0;
+  });
+  const allCycles = enriched;  // total de ciclos existentes (ignora filtro)
+
+  // Totais do que está sendo exibido (linha de rodapé)
+  const totals = cycles.reduce((t, c) => {
+    t.leads += c.leads; t.spend += c.spend;
+    t.cursoPitch += c.cursoPitch; t.cursoAcum += c.cursoAcum; t.cursoRev += c.cursoRev;
+    t.outrosAcum += c.outrosAcum; t.outrosRev += c.outrosRev; t.revAcum += c.revAcum;
+    return t;
+  }, { leads:0, spend:0, cursoPitch:0, cursoAcum:0, cursoRev:0, outrosAcum:0, outrosRev:0, revAcum:0 });
+  const totalCpl  = totals.spend > 0 && totals.leads > 0 ? totals.spend / totals.leads : null;
+  const totalRoas = totals.spend > 0 ? totals.revAcum / totals.spend : null;
+
+  // Indicador de ordenação no cabeçalho
+  const ind = (key) => sort.key === key ? (sort.dir < 0 ? " ▼" : " ▲") : "";
 
   return (
     <div className="fade-up">
@@ -954,35 +1034,65 @@ function SemanalPanel({ cfg, preco }) {
 
       {/* Tabela */}
       <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:8,overflow:"visible"}}>
-        <div style={{padding:"12px 16px 10px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <span style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
-            Ciclos · {allCycles.length} encontrados
-          </span>
-          <span style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
-            <span style={{color:C.blue}}>■</span> SEG &nbsp;
-            <span style={{color:C.purple}}>■</span> QUI
-          </span>
+        <div style={{padding:"12px 16px 10px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+          {/* Filtro por período */}
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Período</span>
+            <input type="date" value={from} onChange={e=>setFrom(e.target.value)}
+              style={{padding:"4px 8px",border:`1px solid ${C.border2}`,borderRadius:3,fontSize:11,color:C.text,background:C.card,fontFamily:"'JetBrains Mono',monospace"}}/>
+            <span style={{color:C.muted,fontSize:11}}>→</span>
+            <input type="date" value={to} onChange={e=>setTo(e.target.value)}
+              style={{padding:"4px 8px",border:`1px solid ${C.border2}`,borderRadius:3,fontSize:11,color:C.text,background:C.card,fontFamily:"'JetBrains Mono',monospace"}}/>
+            {hasFilter && (
+              <button onClick={()=>{setFrom("");setTo("");}} style={{
+                padding:"4px 10px",background:"transparent",border:`1px solid ${C.border}`,color:C.muted,borderRadius:3,
+                cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:9,letterSpacing:1,textTransform:"uppercase",
+              }}>✕ limpar</button>
+            )}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
+              {hasFilter ? `${cycles.length} de ${allCycles.length} ciclos` : `${allCycles.length} ciclos`}
+            </span>
+            <span style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>
+              <span style={{color:C.blue}}>■</span> SEG &nbsp;
+              <span style={{color:C.purple}}>■</span> QUI
+            </span>
+          </div>
         </div>
 
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:hasMeta?720:600}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:hasMeta?960:780}}>
             <thead style={{position:"relative",zIndex:10}}>
+              {/* Linha de grupo: CURSO COMPLETO e OUTROS CURSOS */}
+              <tr>
+                <th/>
+                <th/>
+                {hasMeta && <th/>}
+                {hasMeta && <th/>}
+                <th colSpan={3} style={{padding:"7px 14px 3px",textAlign:"center",fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.blue,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,borderBottom:`2px solid ${C.blue}44`,background:C.blue+"0c"}}>Curso Completo</th>
+                <th colSpan={2} style={{padding:"7px 14px 3px",textAlign:"center",fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.purple,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,borderBottom:`2px solid ${C.purple}44`,background:C.purple+"0c"}}>Outros Cursos</th>
+                <th/>
+                {hasMeta && <th/>}
+              </tr>
               <tr style={{borderBottom:`1px solid ${C.border}`}}>
-                <th style={{padding:"9px 14px",textAlign:"left",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Ciclo</th>
-                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Leads</th>
-                {hasMeta && <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.red+"aa",fontFamily:"'JetBrains Mono',monospace"}}>Gasto</th>}
-                {hasMeta && <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>CPL</th>}
-                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Vendas Pitch</th>
-                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>Fat. Pitch</th>
-                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>Vendas Acum.</th>
-                <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.green+"aa",fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>Fat. Acum.</th>
-                {hasMeta && <th style={{padding:"9px 14px",textAlign:"right",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"88",fontFamily:"'JetBrains Mono',monospace"}}>ROAS</th>}
+                <th onClick={()=>sortBy("ciclo")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",userSelect:"none"}}>Ciclo{ind("ciclo")}</th>
+                <th onClick={()=>sortBy("leads")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",userSelect:"none"}}>Leads{ind("leads")}</th>
+                {hasMeta && <th onClick={()=>sortBy("spend")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.red+"aa",fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",userSelect:"none"}}>Gasto{ind("spend")}</th>}
+                {hasMeta && <th onClick={()=>sortBy("cpl")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",userSelect:"none"}}>CPL{ind("cpl")}</th>}
+                <th onClick={()=>sortBy("cursoPitch")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",background:C.blue+"08",cursor:"pointer",userSelect:"none"}}>Vendas Pitch{ind("cursoPitch")}</th>
+                <th onClick={()=>sortBy("cursoAcum")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,background:C.blue+"08",cursor:"pointer",userSelect:"none"}}>Vendas Acum.{ind("cursoAcum")}</th>
+                <th onClick={()=>sortBy("cursoRev")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.green+"aa",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,background:C.blue+"08",cursor:"pointer",userSelect:"none"}}>Fat.{ind("cursoRev")}</th>
+                <th onClick={()=>sortBy("outrosAcum")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",background:C.purple+"08",cursor:"pointer",userSelect:"none"}}>Vendas{ind("outrosAcum")}</th>
+                <th onClick={()=>sortBy("outrosRev")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",fontWeight:700,background:C.purple+"08",cursor:"pointer",userSelect:"none"}}>Fat.{ind("outrosRev")}</th>
+                <th onClick={()=>sortBy("revAcum")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.green+"aa",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,cursor:"pointer",userSelect:"none"}}>Fat. Acum.{ind("revAcum")}</th>
+                {hasMeta && <th onClick={()=>sortBy("roas")} style={{padding:"9px 14px",textAlign:"center",fontSize:8,letterSpacing:1.5,textTransform:"uppercase",color:C.gold+"88",fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",userSelect:"none"}}>ROAS{ind("roas")}</th>}
               </tr>
             </thead>
             <tbody>
               {cycles.length === 0 && (
                 <tr>
-                  <td colSpan={hasMeta?9:6} style={{padding:"32px",textAlign:"center",color:C.muted,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>
+                  <td colSpan={hasMeta?11:8} style={{padding:"32px",textAlign:"center",color:C.muted,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>
                     {loading ? "buscando dados…" : loaded ? "Nenhum ciclo encontrado · verifique se ciclo_sem está sendo preenchido" : "Clique em Atualizar"}
                   </td>
                 </tr>
@@ -993,40 +1103,75 @@ function SemanalPanel({ cfg, preco }) {
                 const spend      = spendMap[c.ciclo] || 0;
                 const cpl        = spend > 0 && c.leads > 0 ? spend / c.leads : null;
                 const roas       = spend > 0 ? c.revAcum / spend : null;
+                const isOpen     = expanded.has(c.ciclo);
+                const prods      = Object.values(c.products).sort((a,b)=>b.rev-a.rev);
+                const multi      = prods.length > 1;
                 return (
-                  <tr key={c.ciclo} style={{borderBottom:`1px solid ${C.border}`,background:i%2?"#f8fafc":"transparent"}}>
-                    <td style={{padding:"12px 14px"}}>
+                  <Fragment key={c.ciclo}>
+                  <tr onClick={()=>multi&&toggle(c.ciclo)} style={{borderBottom:isOpen?"none":`1px solid ${C.border}`,background:i%2?"#f8fafc":"transparent",cursor:multi?"pointer":"default"}}>
+                    <td style={{padding:"12px 14px",textAlign:"center"}}>
+                      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:C.muted,marginRight:6,visibility:multi?"visible":"hidden"}}>{isOpen?"▾":"▸"}</span>
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:clr,background:clr+"14",padding:"3px 10px",borderRadius:4,border:`1px solid ${clr}33`}}>
                         {c.ciclo}
                       </span>
                     </td>
-                    <td style={{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.teal}}>{fmt.num(c.leads)}</td>
-                    {hasMeta && <td style={{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.red}}>{spend>0?fmt.brl(spend):<span style={{color:C.muted}}>—</span>}</td>}
-                    {hasMeta && <td style={{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{cpl?fmt.brl(cpl):"—"}</td>}
-                    <td style={{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12}}>{fmt.num(c.salesPitch)}</td>
-                    <td style={{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green}}>{fmt.brl(c.revPitch)}</td>
-                    <td style={{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700}}>{fmt.num(c.salesAcum)}</td>
-                    <td style={{padding:"12px 14px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green,fontWeight:700}}>{fmt.brl(c.revAcum)}</td>
-                    {hasMeta && <td style={{padding:"12px 14px",textAlign:"right"}}>{roas!=null?<RoasBadge v={roas}/>:<span style={{color:C.muted,fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>—</span>}</td>}
+                    <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.teal}}>{fmt.num(c.leads)}</td>
+                    {hasMeta && <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.red}}>{spend>0?fmt.brl(spend):<span style={{color:C.muted}}>—</span>}</td>}
+                    {hasMeta && <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{cpl?fmt.brl(cpl):"—"}</td>}
+                    <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,background:C.blue+"08"}}>{fmt.num(c.cursoPitch)}</td>
+                    <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,background:C.blue+"08"}}>{fmt.num(c.cursoAcum)}</td>
+                    <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:c.cursoRev>0?C.green:C.muted,fontWeight:700,background:C.blue+"08"}}>{c.cursoRev>0?fmt.brl(c.cursoRev):"—"}</td>
+                    <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:c.outrosAcum>0?C.purple:C.muted,background:C.purple+"08"}}>{c.outrosAcum>0?fmt.num(c.outrosAcum):"—"}</td>
+                    <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:c.outrosRev>0?C.green:C.muted,fontWeight:700,background:C.purple+"08"}}>{c.outrosRev>0?fmt.brl(c.outrosRev):"—"}</td>
+                    <td style={{padding:"12px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.green,fontWeight:700}}>{fmt.brl(c.revAcum)}</td>
+                    {hasMeta && <td style={{padding:"12px 14px",textAlign:"center"}}>{roas!=null?<RoasBadge v={roas}/>:<span style={{color:C.muted,fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>—</span>}</td>}
                   </tr>
+                  {isOpen && (
+                    <tr style={{borderBottom:`1px solid ${C.border}`,background:i%2?"#f8fafc":"transparent"}}>
+                      <td colSpan={hasMeta?11:8} style={{padding:"4px 14px 14px 40px"}}>
+                        <div style={{fontSize:7,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",margin:"4px 0 8px"}}>Mix de produtos · {prods.length}</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                          {prods.map(p => {
+                            const pct = c.revAcum>0 ? (p.rev/c.revAcum)*100 : 0;
+                            return (
+                              <div key={p.produto} style={{display:"flex",alignItems:"center",gap:10}}>
+                                <span style={{flex:"0 0 200px",fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.produto}</span>
+                                <div style={{flex:1,height:8,background:C.dim,borderRadius:3,overflow:"hidden"}}>
+                                  <div style={{width:`${pct}%`,height:"100%",background:clr,borderRadius:3}}/>
+                                </div>
+                                <span style={{flex:"0 0 50px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:C.muted}}>{fmt.num(p.count)}×</span>
+                                <span style={{flex:"0 0 110px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:C.green,fontWeight:600}}>{fmt.brl(p.rev)}</span>
+                                <span style={{flex:"0 0 48px",textAlign:"right",fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:C.muted}}>{fmt.pct(pct)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
+            {cycles.length > 0 && (
+              <tfoot>
+                <tr style={{borderTop:`2px solid ${C.border2}`,background:"#f1f5f9"}}>
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:9,letterSpacing:1.5,textTransform:"uppercase",color:C.muted,fontWeight:700}}>Total{hasFilter?` (${cycles.length})`:""}</td>
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:C.teal}}>{fmt.num(totals.leads)}</td>
+                  {hasMeta && <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:C.red}}>{totals.spend>0?fmt.brl(totals.spend):"—"}</td>}
+                  {hasMeta && <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:C.muted}}>{totalCpl!=null?fmt.brl(totalCpl):"—"}</td>}
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,background:C.blue+"0f"}}>{fmt.num(totals.cursoPitch)}</td>
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,background:C.blue+"0f"}}>{fmt.num(totals.cursoAcum)}</td>
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:C.green,background:C.blue+"0f"}}>{totals.cursoRev>0?fmt.brl(totals.cursoRev):"—"}</td>
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:totals.outrosAcum>0?C.purple:C.muted,background:C.purple+"0f"}}>{totals.outrosAcum>0?fmt.num(totals.outrosAcum):"—"}</td>
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:700,color:totals.outrosRev>0?C.green:C.muted,background:C.purple+"0f"}}>{totals.outrosRev>0?fmt.brl(totals.outrosRev):"—"}</td>
+                  <td style={{padding:"11px 14px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:13,fontWeight:700,color:C.green}}>{fmt.brl(totals.revAcum)}</td>
+                  {hasMeta && <td style={{padding:"11px 14px",textAlign:"center"}}>{totalRoas!=null?<RoasBadge v={totalRoas}/>:<span style={{color:C.muted,fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>—</span>}</td>}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
-
-        {/* Ver mais */}
-        {hasMore && (
-          <div style={{padding:"12px 16px",borderTop:`1px solid ${C.border}`,textAlign:"center"}}>
-            <button onClick={()=>setVisible(v=>v+8)} style={{
-              padding:"6px 24px",background:"transparent",border:`1px solid ${C.border}`,
-              color:C.muted,borderRadius:4,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",
-              fontSize:10,letterSpacing:1,
-            }}>
-              ↓ ver mais ciclos ({allCycles.length - visible} restantes)
-            </button>
-          </div>
-        )}
       </div>
 
       {!hasMeta && loaded && (
@@ -1060,6 +1205,7 @@ async function fetchSheetsSemanal(cfg, preco) {
     };
     rows = parseCSV(text).slice(1);
   }
+  // Aba principal = vendas do Curso Completo (preço fixo do topo)
   return rows
     .filter(r => r[8] && (r[2]||"").toUpperCase().includes("M6"))
     .map(r => {
@@ -1070,7 +1216,53 @@ async function fetchSheetsSemanal(cfg, preco) {
         ciclo_sem: ciclo,
         sale_date: saleDate,
         campaign: r[2]||"",
+        produto: "Curso Completo",
         value: preco,
+        countsAsLead: true,
+        isCompleto: true,
+        is_pitch: webinarDate ? (saleDate === fmtLocalDate(webinarDate)) : false,
+      };
+    });
+}
+
+// Aba "OUTROS PRODUTOS" — low-tickets com NOME DO PRODUTO (col J) e TICKET (col K) próprios
+async function fetchSheetsOutros(cfg) {
+  if (!cfg.outrosCsvUrl) return [];
+  const res = await fetch(cfg.outrosCsvUrl);
+  if (!res.ok) throw new Error(`CSV Outros Produtos: erro (${res.status})`);
+  const text = await res.text();
+  const parseCSV = (str) => {
+    const lines = str.trim().split("\n");
+    return lines.map(line => {
+      const cols = []; let cur = "", inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ""; }
+        else cur += ch;
+      }
+      cols.push(cur.trim());
+      return cols;
+    });
+  };
+  const idx = (k, def) => { const n = parseInt(cfg[k]); return isNaN(n) ? def : n; };
+  const colProduto = idx("colProduto", 9);
+  const colValor   = idx("colValor", 10);
+  return parseCSV(text).slice(1)
+    .filter(r => r[8])  // precisa ter ciclo_sem
+    .map(r => {
+      const ciclo = (r[8]||"").trim();
+      const saleDate = parseDate((r[0]||"").trim());
+      const webinarDate = parseCicloDate(ciclo);
+      const valor = parseBRL(r[colValor]);
+      return {
+        ciclo_sem: ciclo,
+        sale_date: saleDate,
+        campaign: r[2]||"",
+        produto: (r[colProduto]||"").trim() || "Outro produto",
+        value: valor != null ? valor : 0,
+        countsAsLead: false,  // comprador de low-ticket entra só como venda, não infla Leads
+        isCompleto: false,
         is_pitch: webinarDate ? (saleDate === fmtLocalDate(webinarDate)) : false,
       };
     });
