@@ -372,15 +372,12 @@ async function fetchMetaAds(cfg,from,to){
   const fields="campaign_name,adset_name,ad_name,spend,impressions,clicks,actions";
   const timeRange=encodeURIComponent(JSON.stringify({since:from,until:to}));
   const filtering=encodeURIComponent(JSON.stringify([{field:"campaign.name",operator:"CONTAIN",value:"M5"}]));
-  const baseUrl=`https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&level=ad&filtering=${filtering}&limit=500&access_token=${cfg.metaToken}`;
-  const all=[];
-  let url=baseUrl;
-  while(url){
-    const res=await fetch(url); const data=await res.json();
-    if(data.error) throw new Error(`Meta API: ${data.error.message}`);
-    all.push(...(data.data||[]));
-    url=data.paging?.next||null;
-  }
+  // Chama o proxy seguro (/api/meta) — token fica no servidor, paginação agregada lá
+  const q=`${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&level=ad&filtering=${filtering}&limit=500`;
+  const res=await fetch(`/api/meta?q=${encodeURIComponent(q)}`);
+  const data=await res.json();
+  if(data.error) throw new Error(`Meta API: ${data.error}`);
+  const all=data.data||[];
   return all.map(r=>({
     campaign_name:r.campaign_name, adset_name:r.adset_name, ad_name:r.ad_name,
     spend:parseFloat(r.spend||0), impressions:parseInt(r.impressions||0), clicks:parseInt(r.clicks||0),
@@ -846,17 +843,12 @@ async function fetchMetaM6Daily(cfg) {
   const timeRange = encodeURIComponent(JSON.stringify({ since: fmt90(from), until: fmt90(today) }));
   const fields = "campaign_name,spend,date_start";
   const filtering = encodeURIComponent(JSON.stringify([{field:"campaign.name",operator:"CONTAIN",value:"M6"}]));
-  const baseUrl = `https://graph.facebook.com/v19.0/${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500&access_token=${cfg.metaToken}`;
-  const all = [];
-  let url = baseUrl;
-  while (url) {
-    const res  = await fetch(url);
-    const data = await res.json();
-    if (data.error) throw new Error(`Meta API: ${data.error.message}`);
-    all.push(...(data.data || []));
-    url = data.paging?.next || null;
-  }
-  return all;
+  // Chama o proxy seguro (/api/meta) — token no servidor, paginação agregada lá
+  const q = `${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500`;
+  const res  = await fetch(`/api/meta?q=${encodeURIComponent(q)}`);
+  const data = await res.json();
+  if (data.error) throw new Error(`Meta API: ${data.error}`);
+  return data.data || [];
 }
 
 function getCaptureDatesForCiclo(cicloTag) {
@@ -1781,7 +1773,7 @@ function DiarioPanel({ cfg, preco, precoUpsell=210 }) {
 export default function Dashboard(){
   const [page,setPage]   = useState("dash");
   const [tab,setTab]     = useState("perpetuo");
-  const [cfg,setCfg]     = useState(DEFAULT_CFG);
+  const [cfg,setCfg]     = useState(()=>{ try{ const s=localStorage.getItem("dash_cfg"); const saved=s?JSON.parse(s):{}; return {...DEFAULT_CFG,...saved, metaToken:(saved.metaToken||"").startsWith("EAA")?saved.metaToken:DEFAULT_CFG.metaToken}; }catch{ return DEFAULT_CFG; } });
   const [showPassModal,setShowPassModal] = useState(false);
   const [passInput,setPassInput]         = useState("");
   const [passErr,setPassErr]             = useState(false);
@@ -1881,7 +1873,7 @@ export default function Dashboard(){
       <div className="main-pad" style={{padding:"22px 24px",maxWidth:1440,margin:"0 auto"}}>
         {page==="cfg"?(
           <div className="fade-up">
-            <ConfigPanel cfg={cfg} onSave={c=>{setCfg(c);setPage("dash");load(c,from,to,preco,precoUpsell);}}/>
+            <ConfigPanel cfg={cfg} onSave={c=>{setCfg(c);try{localStorage.setItem("dash_cfg",JSON.stringify(c));}catch{}setPage("dash");load(c,from,to,preco,precoUpsell);}}/>
           </div>
         ):(tab==="diario"?(
             <div style={{padding:"22px 0"}} className="fade-up">
