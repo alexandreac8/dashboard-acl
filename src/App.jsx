@@ -937,7 +937,7 @@ function SemanalPanel({ cfg, preco }) {
           setSpendMap(assignSpendToCycles(metaDaily, cicloKeys));
         } catch(me) {
           setSpendMap({});
-          setMetaError(/expired|token/i.test(me.message) ? "Token do Meta vencido — Gasto, CPL e ROAS indisponíveis até renovar em ⚙ config." : me.message);
+          setMetaError("Gasto, CPL e ROAS do Meta indisponíveis no momento — clique em ↺ Atualizar para tentar de novo.");
         }
       }
       setLoaded(true);
