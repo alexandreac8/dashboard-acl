@@ -368,16 +368,21 @@ function crunchAll(metaAds, salesRows, from, to) {
 }
 
 // ── APIs ──────────────────────────────────────────────────────────────────────
+// Campanha com nome "M6" mas que é do PERPÉTUO (utm antigo não dá pra mudar) — exceção única
+const PERPETUO_EXCECAO = "M6 - PROF - 21-04 -imgs PUBPROF";
+
 async function fetchMetaAds(cfg,from,to){
   const fields="campaign_name,adset_name,ad_name,spend,impressions,clicks,actions";
   const timeRange=encodeURIComponent(JSON.stringify({since:from,until:to}));
-  const filtering=encodeURIComponent(JSON.stringify([{field:"campaign.name",operator:"CONTAIN",value:"M5"}]));
-  // Chama o proxy seguro (/api/meta) — token fica no servidor, paginação agregada lá
-  const q=`${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&level=ad&filtering=${filtering}&limit=500`;
-  const res=await fetch(`/api/meta?q=${encodeURIComponent(q)}`);
-  const data=await res.json();
-  if(data.error) throw new Error(`Meta API: ${data.error}`);
-  const all=data.data||[];
+  // Busca M5 + a campanha-exceção (nome exato) via proxy seguro — token fica no servidor
+  const mkQ=(filt)=>`${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&level=ad&filtering=${encodeURIComponent(JSON.stringify(filt))}&limit=500`;
+  const [r1,r2]=await Promise.all([
+    fetch(`/api/meta?q=${encodeURIComponent(mkQ([{field:"campaign.name",operator:"CONTAIN",value:"M5"}]))}`),
+    fetch(`/api/meta?q=${encodeURIComponent(mkQ([{field:"campaign.name",operator:"EQUAL",value:PERPETUO_EXCECAO}]))}`),
+  ]);
+  const [d1,d2]=await Promise.all([r1.json(),r2.json()]);
+  if(d1.error) throw new Error(`Meta API: ${d1.error}`);
+  const all=[...(d1.data||[]),...(d2.error?[]:(d2.data||[]))];
   return all.map(r=>({
     campaign_name:r.campaign_name, adset_name:r.adset_name, ad_name:r.ad_name,
     spend:parseFloat(r.spend||0), impressions:parseInt(r.impressions||0), clicks:parseInt(r.clicks||0),
@@ -451,9 +456,9 @@ async function fetchSheets(cfg,preco,precoUpsell=210){
       const source=(r[+cfg.colSource]||"").trim().toUpperCase().replace(/\s+/g,"");
       if(source===""||source==="GADS"||source==="GOOGLE"||source==="YOUTUBE"||source==="ORGANIC") return false;
       if(source.length>0 && !source.includes("PRF") && !source.includes("M-SD") && !source.includes("META") && !source.includes("FACE")) return false;
-      // Exclui campanhas M6 (semanal) — pertencem à aba META SEMANAL
+      // Exclui campanhas de ciclo (semanal) — pertencem à aba META SEMANAL
       const campaign=(r[+cfg.colCampaign]||"").toUpperCase();
-      if(campaign.includes("M6")) return false;
+      if(campaign.includes("CICLO")) return false;
       return true;
     })
     .map(r=>{
@@ -835,14 +840,14 @@ function ConfigPanel({cfg,onSave}){
 
 
 
-async function fetchMetaM6Daily(cfg) {
-  // Pega gasto diário dos últimos 90 dias das campanhas M6 (com paginação)
+async function fetchMetaCicloDaily(cfg) {
+  // Pega gasto diário dos últimos 90 dias das campanhas de ciclo (nome contém CICLO)
   const today = new Date();
   const from  = new Date(today); from.setDate(today.getDate() - 90);
   const fmt90 = (d) => d.toISOString().slice(0,10);
   const timeRange = encodeURIComponent(JSON.stringify({ since: fmt90(from), until: fmt90(today) }));
   const fields = "campaign_name,spend,date_start";
-  const filtering = encodeURIComponent(JSON.stringify([{field:"campaign.name",operator:"CONTAIN",value:"M6"}]));
+  const filtering = encodeURIComponent(JSON.stringify([{field:"campaign.name",operator:"CONTAIN",value:"CICLO"}]));
   // Chama o proxy seguro (/api/meta) — token no servidor, paginação agregada lá
   const q = `${cfg.metaAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&level=campaign&filtering=${filtering}&limit=500`;
   const res  = await fetch(`/api/meta?q=${encodeURIComponent(q)}`);
@@ -924,7 +929,7 @@ function SemanalPanel({ cfg, preco }) {
       // Gasto/CPL/ROAS do Meta são opcionais — falha aqui NÃO derruba a aba
       if (cfg.metaAccountId && cfg.metaToken) {
         try {
-          const metaDaily = await fetchMetaM6Daily(cfg);
+          const metaDaily = await fetchMetaCicloDaily(cfg);
           const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
           setSpendMap(assignSpendToCycles(metaDaily, cicloKeys));
         } catch(me) {
@@ -1019,7 +1024,7 @@ function SemanalPanel({ cfg, preco }) {
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
         <div>
           <span style={{fontSize:13,fontWeight:700,color:C.text,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Lançamentos Semanais</span>
-          <span style={{fontSize:9,color:C.muted,marginLeft:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:2}}>CAMPANHAS M6 · CICLOS SEG / QUI</span>
+          <span style={{fontSize:9,color:C.muted,marginLeft:10,fontFamily:"'JetBrains Mono',monospace",letterSpacing:2}}>CAMPANHAS "CICLO" · SEG / QUI</span>
         </div>
         <button onClick={load} style={{padding:"5px 14px",background:C.blue,border:"none",color:"#fff",borderRadius:3,cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:10,fontWeight:600}}>
           {loading ? "carregando…" : "↺ Atualizar"}
@@ -1209,7 +1214,7 @@ async function fetchSheetsSemanal(cfg, preco) {
   }
   // Aba principal = vendas do Curso Completo (preço fixo do topo)
   return rows
-    .filter(r => r[8] && (r[2]||"").toUpperCase().includes("M6"))
+    .filter(r => r[8] && (r[2]||"").toUpperCase().includes("CICLO"))
     .map(r => {
       const ciclo = (r[8]||"").trim();
       const saleDate = parseDate((r[0]||"").trim());
