@@ -906,6 +906,7 @@ function SemanalPanel({ cfg, preco }) {
   const [spendMap, setSpendMap] = useState({});
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState(null);
+  const [metaError,setMetaError]= useState(null);   // falha do Meta (gasto/ROAS) — não-fatal
   const [loaded,   setLoaded]   = useState(false);
   const [from,     setFrom]     = useState("");                // filtro de período (vazio = sem limite)
   const [to,       setTo]       = useState("");
@@ -920,7 +921,7 @@ function SemanalPanel({ cfg, preco }) {
 
   const load = useCallback(async () => {
     if (!cfg.csvUrl && !cfg.metaAccountId) { setLoaded(true); return; }
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setMetaError(null);
     try {
       const [completo, outros] = await Promise.all([
         cfg.csvUrl       ? fetchSheetsSemanal(cfg, preco) : [],
@@ -928,11 +929,16 @@ function SemanalPanel({ cfg, preco }) {
       ]);
       const s = [...completo, ...outros];
       setSales(s);
+      // Gasto/CPL/ROAS do Meta são opcionais — falha aqui NÃO derruba a aba
       if (cfg.metaAccountId && cfg.metaToken) {
-        const metaDaily = await fetchMetaM6Daily(cfg);
-        const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
-        const sm = assignSpendToCycles(metaDaily, cicloKeys);
-        setSpendMap(sm);
+        try {
+          const metaDaily = await fetchMetaM6Daily(cfg);
+          const cicloKeys = [...new Set(s.map(r => r.ciclo_sem).filter(Boolean))];
+          setSpendMap(assignSpendToCycles(metaDaily, cicloKeys));
+        } catch(me) {
+          setSpendMap({});
+          setMetaError(/expired|token/i.test(me.message) ? "Token do Meta vencido — Gasto, CPL e ROAS indisponíveis até renovar em ⚙ config." : me.message);
+        }
       }
       setLoaded(true);
     } catch(e) { setError(e.message); }
@@ -1030,6 +1036,10 @@ function SemanalPanel({ cfg, preco }) {
 
       {error && (
         <div style={{background:"#fef2f2",border:`1px solid #fca5a5`,borderRadius:5,padding:"9px 14px",marginBottom:16,color:C.red,fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>⚠ {error}</div>
+      )}
+
+      {metaError && (
+        <div style={{background:"#fffbeb",border:`1px solid #fde68a`,borderRadius:5,padding:"8px 14px",marginBottom:16,color:"#92400e",fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>⚡ {metaError}</div>
       )}
 
       {/* Tabela */}
