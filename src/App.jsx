@@ -2004,53 +2004,16 @@ export default function Dashboard(){
                             <span style={{fontSize:28,fontWeight:600,color:valid?rcol:C.muted,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{valid?fmt.x(roasProj):"—"}</span>
                           </div>
                           <div style={{width:1,alignSelf:"stretch",background:C.border}}/>
-                          {/* Faturamento + Lucro projetados */}
+                          {/* Lucro adicional (do desafio) + Lucro projetado */}
                           <div style={{display:"flex",flexDirection:"column",gap:8}}>
                             <div>
-                              <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>Fat. projetado</div>
-                              <div style={{fontSize:13,fontWeight:600,color:valid?C.text:C.muted,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{valid?fmt.brl(fatProj):"—"}</div>
+                              <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>Lucro Adicional</div>
+                              <div style={{fontSize:13,fontWeight:600,color:valid?C.green:C.muted,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{valid?`+${fmt.brl(pipeline)}`:"—"}</div>
                             </div>
                             <div>
                               <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>Lucro projetado</div>
                               <div style={{fontSize:13,fontWeight:600,color:!valid?C.muted:lucroProj>=0?C.green:C.red,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{valid?`${lucroProj>=0?"+":""}${fmt.brl(lucroProj)}`:"—"}</div>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* 6+7. PROJEÇÃO — só Captura, ao lado dos demais */}
-                  {isCap && (()=>{
-                    const taxaConv   = 0.008;
-                    const vendasProj = Math.round(totLeads * taxaConv);
-                    const revProj    = vendasProj * preco;
-                    const roasFinal  = totSpend > 0 ? (totRevCap + revProj) / totSpend : null;
-                    const rcol       = roasFinal>=1 ? C.green : C.red;
-                    return (
-                      <div className="kpi-proj" style={{
-                        flex:"2 1 0",minWidth:200,
-                        background:"#f8fafc", border:`1px solid ${C.border}`,
-                        borderRadius:6, padding:"14px 16px",
-                        position:"relative",
-                      }}>
-                        {/* título acima */}
-                        <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:10}}>
-                          📈 Projeção 6m · 0,8%
-                        </div>
-                        <div style={{display:"flex",gap:20}}>
-                          {/* Vendas projetadas */}
-                          <div>
-                            <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:3}}>Vendas proj.</div>
-                            <div style={{fontSize:20,fontWeight:700,color:C.muted,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.num(vendasProj)}</div>
-                            <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:3}}>{fmt.brl(revProj)}</div>
-                          </div>
-                          <div style={{width:1,background:C.border}}/>
-                          {/* ROAS final */}
-                          <div>
-                            <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:3}}>ROAS final proj.</div>
-                            <div style={{fontSize:20,fontWeight:700,color:rcol,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{fmt.x(roasFinal)}</div>
-                            <div style={{fontSize:9,color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginTop:3}}>atual + futuro / gasto</div>
                           </div>
                         </div>
                       </div>
