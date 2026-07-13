@@ -1789,6 +1789,7 @@ export default function Dashboard(){
   const [acaoMode,setAcaoMode] = useState(false);
   const [preco,setPreco] = useState(810);
   const [precoUpsell,setPrecoUpsell] = useState(210);
+  const [valorVfl,setValorVfl] = useState(1.23);
   const [rows,setRows]   = useState([]);
   const [loading,setLd]  = useState(false);
   const [error,setErr]   = useState(null);
@@ -1801,6 +1802,7 @@ export default function Dashboard(){
   };
 
   const handlePrecoUpsell = (v) => { setPrecoUpsell(v); };
+  const handleVfl = (v) => { setValorVfl(v); };
 
   const load=useCallback(async(c,f,t,p,pu=210)=>{
     if(!c.metaToken||(!c.csvUrl&&!c.sheetsApiKey)){
@@ -1925,6 +1927,7 @@ export default function Dashboard(){
               <div style={{display:"flex",gap:10,alignItems:"center"}}>
                 <PriceWidget preco={preco} onChange={handlePreco}/>
                 <PriceWidget preco={precoUpsell} onChange={handlePrecoUpsell} label="Valor Upsell"/>
+                <PriceWidget preco={valorVfl} onChange={handleVfl} label="Valor VFL"/>
                 <ModeToggle mode={mode} onChange={setMode}/>
               </div>
             </div>
@@ -1979,6 +1982,43 @@ export default function Dashboard(){
                       sub={`CPL ${fmt.brl(cpl)}`} subColor={C.gold}
                       labelSize={11} valueSize={28} subSize={13}/>
                   </div>
+
+                  {/* PROJEÇÃO COM DESAFIO — retorno real somando o VFL do volume de leads */}
+                  {(()=>{
+                    const valid     = totSpend>0 && totLeads>0;
+                    const pipeline  = totLeads * valorVfl;          // Leads × VFL
+                    const fatCaixa  = rev + upRev;                  // Vendas + Upsell (já entrou)
+                    const fatProj   = fatCaixa + pipeline;          // caixa + pipeline do desafio
+                    const roasProj  = valid ? fatProj/totSpend : null;
+                    const lucroProj = valid ? fatProj - totSpend : null;
+                    const rcol      = roasColor(roasProj);
+                    return (
+                      <div className="kpi-proj-desafio" style={{flex:"1.6 1 0",minWidth:220,background:`linear-gradient(180deg, ${C.purple}0c, ${C.card})`,border:`1px solid ${C.purple}44`,borderRadius:6,padding:"14px 16px"}}>
+                        <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.purple,fontFamily:"'JetBrains Mono',monospace",marginBottom:10,fontWeight:600}}>
+                          🚀 Projeção com Desafio
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:16}}>
+                          {/* ROAS PROJETADO — destaque */}
+                          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                            <span style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace"}}>ROAS proj.</span>
+                            <span style={{fontSize:28,fontWeight:600,color:valid?rcol:C.muted,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{valid?fmt.x(roasProj):"—"}</span>
+                          </div>
+                          <div style={{width:1,alignSelf:"stretch",background:C.border}}/>
+                          {/* Faturamento + Lucro projetados */}
+                          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                            <div>
+                              <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>Fat. projetado</div>
+                              <div style={{fontSize:13,fontWeight:600,color:valid?C.text:C.muted,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{valid?fmt.brl(fatProj):"—"}</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:8,letterSpacing:2,textTransform:"uppercase",color:C.muted,fontFamily:"'JetBrains Mono',monospace",marginBottom:2}}>Lucro projetado</div>
+                              <div style={{fontSize:13,fontWeight:600,color:!valid?C.muted:lucroProj>=0?C.green:C.red,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{valid?`${lucroProj>=0?"+":""}${fmt.brl(lucroProj)}`:"—"}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* 6+7. PROJEÇÃO — só Captura, ao lado dos demais */}
                   {isCap && (()=>{
