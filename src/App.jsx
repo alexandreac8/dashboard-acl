@@ -286,14 +286,14 @@ function crunchAll(metaAds, salesRows, from, to) {
   }
 
   function calc(subset, spend, leads) {
-    // POR CAPTURA: leads captados no período → quanto geraram (agora ou no futuro próximo)
-    const byCap  = subset.filter(s=>inRange(s.capture_date,from,to));
     // ACUMULADO: tudo que entrou em caixa no período (sale_date), independente de quando capturou
     const bySale = subset.filter(s=>inRange(s.sale_date,from,to));
+    // POR CAPTURA: captura E venda dentro do período (Acumulado é sempre ≥ Por Captura)
+    const byCap  = bySale.filter(s=>inRange(s.capture_date,from,to));
     // Lag = vendas em caixa no período de leads captados ANTES do período
     const lag    = bySale.filter(s=>!inRange(s.capture_date,from,to));
     // Vendas em caixa de leads captados NO período
-    const saleNow= bySale.filter(s=>inRange(s.capture_date,from,to));
+    const saleNow= byCap;
 
     const revCap =byCap.reduce((a,s)=>a+s.value,0);
     // Acumulado = lag (passado) + vendas presentes (captados agora e já compraram)
